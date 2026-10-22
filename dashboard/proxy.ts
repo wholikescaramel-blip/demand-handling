@@ -7,7 +7,14 @@ import { COOKIE, timingSafeEqual, tokenFor } from "./lib/auth.ts";
  */
 export async function proxy(req: NextRequest) {
   const password = process.env.DASHBOARD_PASSWORD;
-  if (!password) return NextResponse.next();
+  if (!password) {
+    // Demo mode (no database) is harmless to leave open. With a database connected, fail closed: the review page can
+    // approve orders, so it must never be reachable without a password.
+    if (process.env.DATABASE_URL) {
+      return new NextResponse("DASHBOARD_PASSWORD is not set. Add it in the Vercel project settings and redeploy.", { status: 503 });
+    }
+    return NextResponse.next();
+  }
 
   const cookie = req.cookies.get(COOKIE)?.value ?? "";
   if (timingSafeEqual(cookie, await tokenFor(password))) return NextResponse.next();
