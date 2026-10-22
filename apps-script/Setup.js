@@ -26,13 +26,13 @@ function setup() {
   }
 
   var order = [SHEETS.RULES, SHEETS.REVIEW, SHEETS.APPROVED, SHEETS.REJECTIONS, SHEETS.DECISIONS, SHEETS.METRICS,
-    SHEETS.RULE_REVIEW, SHEETS.SHADOW, SHEETS.RUNS, SHEETS.SALES, SHEETS.SKU, SHEETS.INV, SHEETS.INV_HIST,
+    SHEETS.POS, SHEETS.RULE_REVIEW, SHEETS.SHADOW, SHEETS.RUNS, SHEETS.SALES, SHEETS.SKU, SHEETS.INV, SHEETS.INV_HIST,
     SHEETS.CAL, SHEETS.DIST, SHEETS.PO];
   order.forEach(function (name, i) {
     if (!ss.getSheetByName(name)) {
       var sh = ss.insertSheet(name);
       var headers = { Review: REVIEW_HEADER, Approved: APPROVED_HEADER, Rejections: REJECTION_HEADER, Decision_Log: DECISION_HEADER,
-        Shadow_Log: SHADOW_HEADER, Run_Log: RUN_HEADER };
+        Shadow_Log: SHADOW_HEADER, Run_Log: RUN_HEADER, Purchase_Orders: PO_HEADER };
       if (headers[name]) {
         sh.getRange(1, 1, 1, headers[name].length).setValues([headers[name]]).setFontWeight('bold').setBackground('#14213d').setFontColor('#ffffff');
         sh.setFrozenRows(1);
@@ -64,7 +64,7 @@ function buildMetrics_() {
     ['Override + reject rate', '=IFERROR((B3+B4)/(B2+B3+B4),"n/a")', 'Adoption kill line: above 40% for 4 straight weeks'],
     ['Adoption kill line breached?', '=IF(ISNUMBER(B6),IF(B6>0.4,"YES: review the rules","no"),"n/a")', ''],
     ['Avg hours to decide', '=IFERROR(AVERAGE(' + D + '!L2:L),"n/a")', 'Target: within 24 hours'],
-    ['POs recorded by procurement', '=COUNTA(Approved!I2:I)', 'Fill PO number in Approved when the PO is keyed into Zoho'],
+    ['POs recorded by procurement', '=COUNTA(Approved!I2:I)', 'PO numbers are filled in from the dashboard'],
     ['Runs logged', '=COUNTA(Run_Log!A2:A)', ''],
     ['Gemini tokens used (all runs)', '=SUM(Run_Log!K2:K)', 'Running cost: tokens x model price']
   ];
@@ -82,7 +82,7 @@ function installTriggers() {
   ScriptApp.newTrigger('runPipeline').timeBased().onWeekDay(ScriptApp.WeekDay.TUESDAY).atHour(8).create();
   ScriptApp.newTrigger('runPipeline').timeBased().onWeekDay(ScriptApp.WeekDay.FRIDAY).atHour(8).create();
   ScriptApp.newTrigger('checkSla').timeBased().everyDays(1).atHour(10).create();
-  ScriptApp.newTrigger('pullDecisions').timeBased().everyHours(6).create();
+  ScriptApp.newTrigger('pullDecisions').timeBased().everyHours(1).create();
 }
 
 var CONFIG_KEYS_ = [

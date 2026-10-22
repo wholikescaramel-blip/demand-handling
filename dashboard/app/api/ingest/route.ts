@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { timingSafeEqual } from "@/lib/auth";
+import { generatePosForReady } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,8 @@ export async function POST(req: Request) {
         where u.mode = 'LIVE' and c.run_id <> ${r.run_id}
           and not exists (select 1 from decisions d where d.run_id = c.run_id and d.sku = c.sku)
         on conflict (run_id, sku) do nothing`;
+      // Approved lines left over from an incomplete review still get their purchase orders.
+      await generatePosForReady();
     }
     return NextResponse.json({ ok: true, run: r.run_id, recs: body.recs.length });
   }

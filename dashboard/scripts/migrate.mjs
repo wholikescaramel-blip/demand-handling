@@ -13,9 +13,11 @@ if (!url) {
   process.exit(1);
 }
 const sql = neon(url);
+// Strip comments first (inline ones too), then split on semicolons. The schema has no string literal containing ';' or '--'.
 const statements = readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8")
-  .split(/;\s*$/m)
-  .map((s) => s.replace(/^\s*--.*$/gm, "").trim())
+  .replace(/--[^\n]*/g, "")
+  .split(";")
+  .map((s) => s.trim())
   .filter(Boolean);
 
 for (const s of statements) await sql.query(s);

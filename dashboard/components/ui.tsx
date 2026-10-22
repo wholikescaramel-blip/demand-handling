@@ -33,8 +33,8 @@ export function DecisionPill({ decision }: { decision: string | null }) {
   return <span className={`pill ${cls}`}>{decision === "EXPIRED" ? "Expired" : decision}</span>;
 }
 
-const PO_CLASS: Record<string, string> = { READY: "warn", PENDING: "warn", CREATED: "ok", FAILED: "breach", NONE: "na" };
-const PO_LABEL: Record<string, string> = { READY: "Ready for Zoho", PENDING: "Creating…", CREATED: "PO created", FAILED: "PO failed", NONE: "No PO" };
+const PO_CLASS: Record<string, string> = { READY: "warn", CREATED: "ok", NONE: "na" };
+const PO_LABEL: Record<string, string> = { READY: "Approved, PO pending", CREATED: "PO generated", NONE: "No PO" };
 
 export function PoPill({ status }: { status: string | null | undefined }) {
   const s = status ?? "NONE";

@@ -1,6 +1,6 @@
 /** Pure decision and purchase-order logic. No network, no database: unit-tested. */
 
-export type PoStatus = "NONE" | "READY" | "PENDING" | "CREATED" | "FAILED";
+export type PoStatus = "NONE" | "READY" | "CREATED";
 
 export type DecisionInput = {
   action: string; // REORDER | PAUSE | MANUAL_REVIEW
@@ -64,4 +64,22 @@ export function groupByVendor(lines: PoLine[]): VendorGroup[] {
   return [...by.values()]
     .sort((a, b) => (a.key < b.key ? -1 : 1))
     .map((g) => ({ ...g, lines: g.lines.sort((a, b) => (a.sku < b.sku ? -1 : 1)) }));
+}
+
+/** DP-2026-0007: year plus a zero-padded sequence that never repeats (Postgres sequence). */
+export function formatPoNumber(seq: number, date: Date = new Date()): string {
+  return `DP-${date.getUTCFullYear()}-${String(seq).padStart(4, "0")}`;
+}
+
+export type OpenPoInput = { created_at: string; received_at: string | null; lines: { sku: string; qty: number }[] };
+
+/** Stock on order: lines of POs not yet marked received and created within the last `days` days. */
+export function aggregateOpenQty(pos: OpenPoInput[], days: number, now: number = Date.now()): { sku: string; qty_on_order: number }[] {
+  const since = now - days * 86400000;
+  const by = new Map<string, number>();
+  for (const po of pos) {
+    if (po.received_at || new Date(po.created_at).getTime() < since) continue;
+    for (const l of po.lines) by.set(l.sku, (by.get(l.sku) ?? 0) + l.qty);
+  }
+  return [...by.entries()].map(([sku, qty_on_order]) => ({ sku, qty_on_order })).sort((a, b) => (a.sku < b.sku ? -1 : 1));
 }

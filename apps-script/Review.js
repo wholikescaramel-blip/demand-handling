@@ -152,7 +152,7 @@ function notifyProcurement_(count) {
   var to = prop_('PROCUREMENT_EMAIL');
   if (!to || !count) return;
   MailApp.sendEmail(to, 'Approved demand-planning list: ' + count + ' SKU(s)',
-    'Raghav has approved ' + count + ' recommendation(s). Place the POs in Zoho Inventory by hand, then record the PO number in the Approved tab.\n\n' +
+    'Raghav has approved ' + count + ' recommendation(s). Create the purchase orders and record each PO number in the Approved tab.\n\n' +
     SpreadsheetApp.getActive().getUrl());
 }
 

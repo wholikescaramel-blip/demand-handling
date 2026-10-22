@@ -13,3 +13,6 @@ next-env.d.ts
 
 # Apps Script project binding (local only)
 .clasp.json
+
+.vercel
+.env*

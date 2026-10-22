@@ -407,8 +407,8 @@
    "reviewer": "raghav@freshroots.example",
    "hours_to_decide": 8,
    "po_status": "CREATED",
-   "po_number": "PO-DEMO-0002",
-   "po_id": "demo-PO-DEMO-0002",
+   "po_number": "DP-2026-0002",
+   "po_id": "demo-DP-2026-0002",
    "po_vendor": "GrainPath Logistics",
    "po_error": null,
    "po_created_at": "2026-10-16T11:40:00+05:30"
@@ -449,8 +449,8 @@
    "reviewer": "raghav@freshroots.example",
    "hours_to_decide": 19,
    "po_status": "CREATED",
-   "po_number": "PO-DEMO-0001",
-   "po_id": "demo-PO-DEMO-0001",
+   "po_number": "DP-2026-0003",
+   "po_id": "demo-DP-2026-0003",
    "po_vendor": "NutriFlow Distributors",
    "po_error": null,
    "po_created_at": "2026-10-16T11:40:00+05:30"
@@ -470,8 +470,8 @@
    "reviewer": "raghav@freshroots.example",
    "hours_to_decide": 11,
    "po_status": "CREATED",
-   "po_number": "PO-DEMO-0002",
-   "po_id": "demo-PO-DEMO-0002",
+   "po_number": "DP-2026-0002",
+   "po_id": "demo-DP-2026-0002",
    "po_vendor": "GrainPath Logistics",
    "po_error": null,
    "po_created_at": "2026-10-16T11:40:00+05:30"
@@ -491,8 +491,8 @@
    "reviewer": "raghav@freshroots.example",
    "hours_to_decide": 6,
    "po_status": "CREATED",
-   "po_number": "PO-DEMO-0004",
-   "po_id": "demo-PO-DEMO-0004",
+   "po_number": "DP-2026-0001",
+   "po_id": "demo-DP-2026-0001",
    "po_vendor": "Meridian Trade Co.",
    "po_error": null,
    "po_created_at": "2026-10-16T11:40:00+05:30"
@@ -517,6 +517,71 @@
    "po_vendor": null,
    "po_error": null,
    "po_created_at": null
+  }
+ ],
+ "pos": [
+  {
+   "po_number": "DP-2026-0003",
+   "created_at": "2026-10-16T11:40:00+05:30",
+   "vendor_key": "DIST001",
+   "vendor_name": "NutriFlow Distributors",
+   "run_ids": "DEMO-2026-W41",
+   "created_by": "raghav@freshroots.example",
+   "total_qty": 120,
+   "lines": [
+    {
+     "run_id": "DEMO-2026-W41",
+     "sku": "SKU013",
+     "name": "Freshroots Peanut Butter 300g",
+     "qty": 120
+    }
+   ],
+   "delivered_at": "2026-10-16T12:05:00+05:30",
+   "received_at": null
+  },
+  {
+   "po_number": "DP-2026-0002",
+   "created_at": "2026-10-16T11:40:00+05:30",
+   "vendor_key": "DIST002",
+   "vendor_name": "GrainPath Logistics",
+   "run_ids": "DEMO-2026-W41",
+   "created_by": "raghav@freshroots.example",
+   "total_qty": 480,
+   "lines": [
+    {
+     "run_id": "DEMO-2026-W41",
+     "sku": "SKU004",
+     "name": "Freshroots Almond Milk 500ml",
+     "qty": 180
+    },
+    {
+     "run_id": "DEMO-2026-W41",
+     "sku": "SKU003",
+     "name": "Freshroots Brown Rice 1kg",
+     "qty": 300
+    }
+   ],
+   "delivered_at": "2026-10-16T12:05:00+05:30",
+   "received_at": null
+  },
+  {
+   "po_number": "DP-2026-0001",
+   "created_at": "2026-10-16T11:40:00+05:30",
+   "vendor_key": "DIST004",
+   "vendor_name": "Meridian Trade Co.",
+   "run_ids": "DEMO-2026-W41",
+   "created_by": "raghav@freshroots.example",
+   "total_qty": 500,
+   "lines": [
+    {
+     "run_id": "DEMO-2026-W41",
+     "sku": "SKU011",
+     "name": "Freshroots Multigrain Bread 400g",
+     "qty": 500
+    }
+   ],
+   "delivered_at": "2026-10-16T12:05:00+05:30",
+   "received_at": null
   }
  ],
  "ruleReviews": [

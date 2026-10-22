@@ -54,6 +54,8 @@ for (const [wk, asOf, mode] of cuts) {
 
 // Illustrative decisions (clearly labelled as demo in the UI).
 const decisions = [];
+const poFor = {};
+let poSeq = 0;
 const plan = {
   "DEMO-2026-W41": { at: "2026-10-16T10:30:00+05:30", mix: ["Approve", "Approve", "Override", "Approve", "Reject", "Approve"] },
   "DEMO-2026-W42": { at: "2026-10-23T09:15:00+05:30", limit: 4, mix: ["Approve", "Override", "Approve", "Approve", "Override", "Reject", "Approve"] },
@@ -70,7 +72,7 @@ for (const [run_id, p] of Object.entries(plan)) {
     const orders = decision !== "Reject" && final_qty > 0;
     const created = orders && run_id === "DEMO-2026-W41";
     const po_status = created ? "CREATED" : orders ? "READY" : "NONE";
-    const po_number = created ? "PO-DEMO-" + r.distributor_id.slice(-1).padStart(4, "0") : null;
+    const po_number = created ? (poFor[r.distributor_id] ??= "DP-2026-" + String(++poSeq).padStart(4, "0")) : null;
     decisions.push({
       decided_at: p.at, run_id, sku: r.sku, name: r.name, action: r.action, rec_qty: r.rec_qty, flags: r.flags, priority: r.priority,
       decision, final_qty, reason: why[decision] ?? null, reviewer: "raghav@freshroots.example", hours_to_decide: hours,
@@ -81,6 +83,21 @@ for (const [run_id, p] of Object.entries(plan)) {
   });
 }
 
+const pos = Object.values(
+  decisions.filter((d) => d.po_status === "CREATED").reduce((acc, d) => {
+    const key = d.po_number;
+    const rec = Object.values(recsByRun).flat().find((r) => r.run_id === d.run_id && r.sku === d.sku);
+    acc[key] ??= {
+      po_number: key, created_at: "2026-10-16T11:40:00+05:30", vendor_key: rec.distributor_id, vendor_name: rec.distributor_name,
+      run_ids: d.run_id, created_by: "raghav@freshroots.example", total_qty: 0, lines: [],
+      delivered_at: "2026-10-16T12:05:00+05:30", received_at: null,
+    };
+    acc[key].lines.push({ run_id: d.run_id, sku: d.sku, name: d.name, qty: d.final_qty });
+    acc[key].total_qty += d.final_qty;
+    return acc;
+  }, {}),
+).reverse();
+
 const latest = runs[runs.length - 1];
 const out = {
   demo: true,
@@ -88,6 +105,7 @@ const out = {
   latestRun: latest,
   recs: recsByRun[latest.run_id],
   decisions: decisions.slice().reverse(),
+  pos,
   ruleReviews: [
     { opened_at: "2026-10-23T09:20:00+05:30", rule: "STOCKOUT_RISK", changed: 5, total: 10, rate: "50%", proposal: "Illustrative: overrides cluster on fast-moving SKUs in festival weeks, so test a larger reorder multiple there before touching the 6-week floor.", status: "OPEN" },
   ],

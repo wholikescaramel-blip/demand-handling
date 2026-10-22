@@ -4,7 +4,7 @@ var SHEETS = {
   RULES: 'Rules_Config', SALES: 'Sales', SKU: 'SKU_Master', INV: 'Inventory', INV_HIST: 'Inventory_History',
   CAL: 'Calendar', DIST: 'Distributors', PO: 'Open_POs',
   REVIEW: 'Review', APPROVED: 'Approved', REJECTIONS: 'Rejections', DECISIONS: 'Decision_Log',
-  SHADOW: 'Shadow_Log', RULE_REVIEW: 'Rule_Review', RUNS: 'Run_Log', METRICS: 'Metrics'
+  SHADOW: 'Shadow_Log', RULE_REVIEW: 'Rule_Review', RUNS: 'Run_Log', METRICS: 'Metrics', POS: 'Purchase_Orders'
 };
 
 /** [key, value, description]. Raghav's five rules plus the knobs the build decisions turned into config. */

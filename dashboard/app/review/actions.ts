@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { checkDecision } from "@/lib/po";
-import { createPosForReady } from "@/lib/orders";
+import { generateIfRunComplete, generatePosForReady } from "@/lib/orders";
 
 const back = (params: Record<string, string>) => `/review?${new URLSearchParams(params).toString()}`;
 
@@ -49,18 +49,34 @@ export async function decide(formData: FormData) {
     returning sku`;
   if (!rows.length) redirect(back({ error: "Someone already decided this one.", sku }));
 
+  // Last decision of the run? Then its approved lines become purchase orders straight away.
+  const gen = await generateIfRunComplete(run_id);
+
   revalidatePath("/review");
+  revalidatePath("/orders");
   revalidatePath("/");
   const verb = { Approve: "approved", Override: "overridden", Reject: "rejected" }[check.decision];
-  redirect(back({ ok: `${sku} ${verb}.` }));
+  const made = gen?.created.length
+    ? ` All lines decided: ${gen.created.length} purchase order(s) generated (${gen.created.map((c) => c.po_number).join(", ")}).`
+    : "";
+  redirect(back({ ok: `${sku} ${verb}.${made}` }));
 }
 
-/** One PO per vendor for everything approved and not yet ordered (also retries failures). */
-export async function createPos() {
-  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Demo mode: connect a database and Zoho first."));
-  const r = await createPosForReady();
+/** For a partial review (for example end of day): generate POs for what is approved so far. */
+export async function generatePos() {
+  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Demo mode: connect a database first."));
+  const r = await generatePosForReady();
   revalidatePath("/orders");
   revalidatePath("/review");
-  if (!r.configured) redirect("/orders?error=" + encodeURIComponent("Zoho is not configured. Add the ZOHO_* variables, then try again."));
-  redirect(`/orders?created=${r.created.length}&failed=${r.failed.length}`);
+  if (r.failed.length) redirect("/orders?error=" + encodeURIComponent(r.failed.map((f) => `${f.vendor}: ${f.error}`).join("; ")));
+  redirect(`/orders?created=${r.created.length}`);
+}
+
+/** Goods arrived: the PO stops counting as stock on order. */
+export async function markReceived(formData: FormData) {
+  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Demo mode: connect a database first."));
+  const sql = neon(process.env.DATABASE_URL!);
+  await sql`update purchase_orders set received_at = now() where po_number = ${String(formData.get("po_number") ?? "")} and received_at is null`;
+  revalidatePath("/orders");
+  redirect("/orders");
 }

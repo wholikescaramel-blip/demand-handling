@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkDecision, groupByVendor, type PoLine } from "../lib/po.ts";
-import { buildPoPayload, isOpenStatus, openQtyByLine, zohoCfg } from "../lib/zoho.ts";
+import { aggregateOpenQty, checkDecision, formatPoNumber, groupByVendor, type PoLine } from "../lib/po.ts";
+import { PDFDocument } from "pdf-lib";
+import { buildPoPdf, pdfText } from "../lib/pdf.ts";
 
 const base = { action: "REORDER", recQty: 750, decision: "Approve", overrideQty: "", reason: "" };
 
@@ -52,41 +53,43 @@ test("groupByVendor makes one PO per vendor with stable ordering", () => {
   ]);
 });
 
-test("buildPoPayload: vendor, line items, optional rate and number", () => {
-  const p = buildPoPayload({
-    vendorId: "V1", date: "2026-10-23", reference: "DP-R1", notes: "Approved by raghav",
-    lines: [{ item_id: "I1", quantity: 750, purchase_rate: 42, name: "Mango Drink" }, { item_id: "I2", quantity: 120, purchase_rate: null, name: "Peanut Butter" }],
-  });
-  assert.equal(p.vendor_id, "V1");
-  assert.equal(p.purchaseorder_number, undefined);
-  assert.deepEqual(p.line_items[0], { item_id: "I1", name: "Mango Drink", quantity: 750, purchase_rate: 42 });
-  assert.equal("purchase_rate" in p.line_items[1], false);
-  const numbered = buildPoPayload({ vendorId: "V1", date: "2026-10-23", reference: "r", notes: "n", number: "DP-1", lines: [] });
-  assert.equal(numbered.purchaseorder_number, "DP-1");
+test("formatPoNumber: year plus a zero-padded sequence", () => {
+  assert.equal(formatPoNumber(7, new Date("2026-10-23T00:00:00Z")), "DP-2026-0007");
+  assert.equal(formatPoNumber(12345, new Date("2027-01-02T00:00:00Z")), "DP-2027-12345");
 });
 
-test("openQtyByLine counts only what is still to be received and maps item ids to SKUs", () => {
-  const map = new Map([["I9", "SKU009"]]);
-  const out = openQtyByLine(
-    { line_items: [{ sku: "SKU001", quantity: 500, quantity_received: 200 }, { item_id: "I9", quantity: 80 }, { sku: "SKU002", quantity: 10, quantity_received: 10 }, { item_id: "??", quantity: 5 }] },
-    map,
+test("aggregateOpenQty counts unreceived, recent POs only and sums per SKU", () => {
+  const now = new Date("2026-10-30T00:00:00Z").getTime();
+  const out = aggregateOpenQty(
+    [
+      { created_at: "2026-10-25T00:00:00Z", received_at: null, lines: [{ sku: "SKU001", qty: 750 }, { sku: "SKU003", qty: 300 }] },
+      { created_at: "2026-10-27T00:00:00Z", received_at: null, lines: [{ sku: "SKU001", qty: 100 }] },
+      { created_at: "2026-10-26T00:00:00Z", received_at: "2026-10-29T00:00:00Z", lines: [{ sku: "SKU009", qty: 80 }] },
+      { created_at: "2026-08-01T00:00:00Z", received_at: null, lines: [{ sku: "SKU013", qty: 120 }] },
+    ],
+    21,
+    now,
   );
-  assert.deepEqual(out, [{ sku: "SKU001", open: 300 }, { sku: "SKU009", open: 80 }]);
+  assert.deepEqual(out, [{ sku: "SKU001", qty_on_order: 850 }, { sku: "SKU003", qty_on_order: 300 }]);
 });
 
-test("isOpenStatus treats draft and open as on order, billed and cancelled as closed", () => {
-  assert.equal(isOpenStatus("draft"), true);
-  assert.equal(isOpenStatus("open"), true);
-  assert.equal(isOpenStatus("Billed"), false);
-  assert.equal(isOpenStatus("cancelled"), false);
+test("pdfText maps typographic characters and drops anything the PDF fonts cannot draw", () => {
+  assert.equal(pdfText("Raghav’s “plan” – 5 · units…"), "Raghav's \"plan\" - 5 - units...");
+  assert.equal(pdfText("Tea ☕ 25 bags"), "Tea  25 bags");
 });
 
-test("zohoCfg is null until every credential is set, and defaults to draft POs in India", () => {
-  assert.equal(zohoCfg({}), null);
-  const c = zohoCfg({ ZOHO_CLIENT_ID: "a", ZOHO_CLIENT_SECRET: "b", ZOHO_REFRESH_TOKEN: "c", ZOHO_ORG_ID: "d", ZOHO_VENDOR_MAP: '{"DIST001":"V1"}' });
-  assert.ok(c);
-  assert.equal(c.dc, "in");
-  assert.equal(c.poStatus, "draft");
-  assert.equal(c.vendorMap.DIST001, "V1");
-  assert.equal(zohoCfg({ ZOHO_CLIENT_ID: "a", ZOHO_CLIENT_SECRET: "b", ZOHO_REFRESH_TOKEN: "c", ZOHO_ORG_ID: "d", ZOHO_PO_STATUS: "issued" })!.poStatus, "issued");
+test("buildPoPdf produces a real PDF, including a long multi-page order", async () => {
+  const mk = (n: number) => ({
+    po_number: "DP-2026-0001", created_at: "2026-10-23T09:15:00+05:30", vendor_name: "NutriFlow Distributors", vendor_key: "DIST001",
+    run_ids: "R20261023-0800", created_by: "raghav", total_qty: n * 10,
+    lines: Array.from({ length: n }, (_, i) => ({ sku: `SKU${String(i + 1).padStart(3, "0")}`, name: "Freshroots Mango Drink 200ml", qty: 10, run_id: "R1" })),
+  });
+  const small = await buildPoPdf(mk(3));
+  assert.equal(Buffer.from(small.slice(0, 5)).toString(), "%PDF-");
+  assert.ok(small.length > 1500);
+  const big = await buildPoPdf(mk(70));
+  assert.ok(big.length > small.length);
+  const pages = (await PDFDocument.load(big)).getPageCount();
+  assert.ok(pages >= 3, `expected a multi-page PO, got ${pages}`);
+  assert.equal((await PDFDocument.load(small)).getPageCount(), 1);
 });

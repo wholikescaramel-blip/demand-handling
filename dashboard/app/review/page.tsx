@@ -1,8 +1,7 @@
 import { getSnapshot } from "@/lib/data";
 import { groupByVendor } from "@/lib/po";
-import { zohoCfg } from "@/lib/zoho";
 import { ActionPill, DecisionPill, DemoBanner, PoPill, fmtDateTime } from "@/components/ui";
-import { createPos, decide } from "./actions";
+import { decide, generatePos } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +12,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const live = run?.mode === "LIVE";
   const pending = live ? snap.recs.filter((r) => !r.decision) : [];
   const decided = live ? snap.recs.filter((r) => r.decision) : [];
-  const ready = decided.filter((r) => r.po_status === "READY" || r.po_status === "FAILED");
+  const ready = decided.filter((r) => r.po_status === "READY");
   const vendorCount = groupByVendor(
     ready.map((r) => ({ run_id: r.run_id, sku: r.sku, name: r.name, qty: r.final_qty ?? 0, vendor_key: r.distributor_id ?? "UNKNOWN", vendor_name: r.distributor_name ?? null })),
   ).length;
-  const zoho = Boolean(zohoCfg());
   const locked = snap.demo;
 
   return (
@@ -50,14 +48,15 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <section className="card" style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
             <div>
-              <h2 style={{ marginBottom: 2 }}>Approved, ready for Zoho</h2>
+              <h2 style={{ marginBottom: 2 }}>Approved, waiting for a purchase order</h2>
               <span className="small dim">
-                {ready.length} line(s) across {vendorCount} vendor(s). One purchase order is created per vendor. {zoho ? "" : "Zoho is not configured yet."}
+                {ready.length} line(s) across {vendorCount} vendor(s). PO PDFs are generated automatically once every line in this run has a
+                decision, or when the next run arrives. One PO per vendor.
               </span>
             </div>
-            <form action={createPos}>
+            <form action={generatePos}>
               <button className="btn primary" type="submit" disabled={locked || !ready.length}>
-                Create POs in Zoho{ready.length ? ` (${vendorCount})` : ""}
+                Generate POs now{ready.length ? ` (${vendorCount})` : ""}
               </button>
             </form>
           </div>
@@ -122,7 +121,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                     <td><DecisionPill decision={r.decision} /></td>
                     <td className="num">{r.final_qty ?? "—"}</td>
                     <td className="reason">{r.change_reason ?? <span className="dim">—</span>}</td>
-                    <td><PoPill status={r.po_status} />{r.po_number ? <div className="small dim">{r.po_number}</div> : null}</td>
+                    <td><PoPill status={r.po_status} />{r.po_number ? <div className="small"><a href={`/api/po/${r.po_number}`} target="_blank" rel="noreferrer">{r.po_number} (PDF)</a></div> : null}</td>
                   </tr>
                 ))}
               </tbody>

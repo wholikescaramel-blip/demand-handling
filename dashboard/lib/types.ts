@@ -59,7 +59,7 @@ export type Decision = {
   reviewer: string | null;
   hours_to_decide: number | null;
   name?: string | null;
-  po_status?: string | null; // NONE | READY | CREATED | FAILED
+  po_status?: string | null; // NONE | READY | CREATED
   po_number?: string | null;
   po_id?: string | null;
   po_vendor?: string | null;
@@ -77,6 +77,21 @@ export type RuleReview = {
   status: string;
 };
 
+export type PoLineRow = { run_id: string; sku: string; name: string | null; qty: number };
+
+export type PurchaseOrder = {
+  po_number: string;
+  created_at: string; // ISO
+  vendor_key: string;
+  vendor_name: string | null;
+  run_ids: string | null;
+  created_by: string | null;
+  total_qty: number;
+  lines: PoLineRow[];
+  delivered_at: string | null; // filed in Drive / emailed by Apps Script
+  received_at: string | null; // goods received: stops counting as stock on order
+};
+
 export type Snapshot = {
   demo: boolean;
   runs: Run[]; // newest first
@@ -84,4 +99,5 @@ export type Snapshot = {
   recs: Rec[]; // for latestRun, priority desc
   decisions: Decision[]; // newest first
   ruleReviews: RuleReview[];
+  pos: PurchaseOrder[]; // newest first
 };

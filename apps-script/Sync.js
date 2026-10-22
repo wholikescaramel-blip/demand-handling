@@ -15,11 +15,15 @@ function sheetStampToIso_(s) {
 
 /** Returns {skipped:true} | {ok:true} | {ok:false, error}. */
 function pushToDashboard_(payload) {
+  return dashboardPost_('/api/ingest', payload);
+}
+
+function dashboardPost_(path, payload) {
   var url = prop_('DASHBOARD_URL');
   var secret = prop_('SYNC_SECRET');
   if (!url || !secret) return { skipped: true };
   try {
-    var resp = UrlFetchApp.fetch(url.replace(/\/+$/, '') + '/api/ingest', {
+    var resp = UrlFetchApp.fetch(url.replace(/\/+$/, '') + path, {
       method: 'post', contentType: 'application/json', headers: { 'x-sync-secret': secret },
       payload: JSON.stringify(payload), muteHttpExceptions: true
     });
@@ -78,7 +82,7 @@ function syncAllToDashboard() {
     '\n\nRuns sync automatically at the end of each pipeline run.');
 }
 
-/** True when review happens in the web dashboard (Raghav approves there, POs go to Zoho from there). */
+/** True when review happens in the web dashboard (Raghav approves there, PO PDFs are generated there). */
 function dashboardMode_() {
   return Boolean(prop_('DASHBOARD_URL') && prop_('SYNC_SECRET'));
 }
@@ -97,19 +101,19 @@ function dashboardGet_(path) {
 }
 
 /**
- * Stock already on order, read from Zoho through the dashboard (Zoho credentials stay there).
- * Overwrites the Open_POs tab. If Zoho is not configured or the call fails, the CSV feed stays in place.
+ * Stock already on order: the POs the dashboard generated that nobody has marked received yet.
+ * Overwrites the Open_POs tab. If the call fails, the CSV feed (open_pos.csv) stays in place.
  * Returns a note for Run_Log, or '' when there is nothing to say.
  */
 function pullOpenPos_() {
   if (!dashboardMode_()) return '';
   var r = dashboardGet_('/api/open-pos');
-  if (!r.ok) return 'Open POs from Zoho unavailable: ' + r.error;
+  if (!r.ok) return 'Open POs unavailable: ' + r.error;
   if (!r.json.configured) return '';
   var items = r.json.items || [];
   writeTable_(SHEETS.PO, ['SKU_ID', 'Qty_On_Order', 'Expected_Date'],
     items.map(function (i) { return [i.sku, i.qty_on_order, i.expected_date || '']; }), [3]);
-  return 'Open POs from Zoho: ' + items.length + ' SKU(s) on order';
+  return 'On order (generated POs): ' + items.length + ' SKU(s)';
 }
 
 /**
@@ -163,9 +167,11 @@ function pullDecisions_() {
   return { ok: true, added: logRows.length, updated: updated };
 }
 
-/** Trigger (every 6 hours) and menu entry. */
+/** Trigger (hourly) and menu entry: mirror decisions back, then file and email any new PO PDFs. */
 function pullDecisions() {
   var r = pullDecisions_();
+  var d = deliverPos_();
+  if (d.ok === false) appendRows_(SHEETS.RUNS, RUN_HEADER, [['DELIVER', fmtDate_(new Date()), '', '', '', '', '', '', '', '', '', 'PO DELIVERY FAILED', d.error]], [2]);
   if (r.ok === false) appendRows_(SHEETS.RUNS, RUN_HEADER, [['PULL', fmtDate_(new Date()), '', '', '', '', '', '', '', '', '', 'PULL FAILED', r.error]], [2]);
   return r;
 }
@@ -174,5 +180,73 @@ function pullDecisionsFromMenu() {
   var ui = SpreadsheetApp.getUi();
   if (!dashboardMode_()) { ui.alert('Set DASHBOARD_URL and SYNC_SECRET first (Configure).'); return; }
   var r = pullDecisions_();
-  ui.alert(r.ok === false ? 'Could not reach the dashboard: ' + r.error : 'Pulled ' + r.added + ' new decision(s); filled ' + r.updated + ' PO number(s).');
+  var d = deliverPos_();
+  ui.alert(r.ok === false ? 'Could not reach the dashboard: ' + r.error :
+    'Pulled ' + r.added + ' new decision(s); filled ' + r.updated + ' PO number(s).' +
+    (d.ok === false ? '\n\nPO delivery failed: ' + d.error : '\nFiled and sent ' + (d.delivered || 0) + ' purchase order PDF(s).'));
+}
+
+var PO_HEADER = ['PO number', 'Vendor', 'Created', 'Units', 'Lines', 'Approved by', 'Drive file', 'Emailed to'];
+
+/** The "Purchase Orders" folder inside the CSV folder, created on first use. */
+function poFolder_() {
+  var parent = DriveApp.getFolderById(prop_('DRIVE_FOLDER_ID'));
+  var it = parent.getFoldersByName('Purchase Orders');
+  return it.hasNext() ? it.next() : parent.createFolder('Purchase Orders');
+}
+
+/**
+ * New purchase orders from the dashboard: save each PDF in Drive, email it to procurement, log it in the
+ * Purchase_Orders tab, then tell the dashboard it has been delivered. Safe to re-run: a PO already in the tab is
+ * not filed or emailed twice, only marked delivered.
+ * Returns {ok, delivered} or {ok:false, error}.
+ */
+function deliverPos_() {
+  if (!dashboardMode_()) return { ok: true, delivered: 0, skipped: true };
+  if (!prop_('DRIVE_FOLDER_ID')) return { ok: false, error: 'DRIVE_FOLDER_ID is not set' };
+  var r = dashboardGet_('/api/pos');
+  if (!r.ok) return r;
+  var pos = r.json.pos || [];
+  if (!pos.length) return { ok: true, delivered: 0 };
+
+  var have = {};
+  readTable_(SHEETS.POS).forEach(function (p) { have[String(p['PO number'])] = true; });
+  var folder = poFolder_();
+  var to = prop_('PROCUREMENT_EMAIL');
+  var base = prop_('DASHBOARD_URL').replace(/\/+$/, '');
+  var rows = [], done = [], errors = [];
+
+  pos.forEach(function (po) {
+    try {
+      if (!have[po.po_number]) {
+        var resp = UrlFetchApp.fetch(base + '/api/po/' + encodeURIComponent(po.po_number), {
+          headers: { 'x-sync-secret': prop_('SYNC_SECRET') }, muteHttpExceptions: true
+        });
+        if (resp.getResponseCode() !== 200) throw new Error('PDF HTTP ' + resp.getResponseCode());
+        var blob = resp.getBlob().setName(po.po_number + '.pdf');
+        var file = folder.createFile(blob);
+        if (to) {
+          MailApp.sendEmail({
+            to: to,
+            subject: 'Purchase order ' + po.po_number + ' for ' + (po.vendor_name || po.vendor_key),
+            body: 'Approved by ' + (po.created_by || 'the demand planner') + '. ' + po.lines.length + ' line(s), ' + po.total_qty +
+              ' units. The PDF is attached; please send it to the vendor.\n\nFiled in Drive: ' + file.getUrl(),
+            attachments: [blob]
+          });
+        }
+        rows.push([po.po_number, po.vendor_name || po.vendor_key, fmtDate_(new Date(po.created_at)), po.total_qty, po.lines.length,
+          po.created_by || '', file.getUrl(), to || '(no PROCUREMENT_EMAIL set)']);
+      }
+      done.push(po.po_number);
+    } catch (e) {
+      errors.push(po.po_number + ': ' + String(e.message || e).slice(0, 100));
+    }
+  });
+  appendRows_(SHEETS.POS, PO_HEADER, rows, [3]);
+  if (done.length) {
+    var m = dashboardPost_('/api/pos', { po_numbers: done });
+    if (m.ok === false) errors.push('could not mark delivered: ' + m.error);
+  }
+  if (errors.length) return { ok: false, error: errors.join(' | '), delivered: done.length };
+  return { ok: true, delivered: done.length };
 }

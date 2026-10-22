@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import demo from "./demo-data.json";
-import type { Decision, Rec, Run, RuleReview, Snapshot } from "./types.ts";
+import type { Decision, PurchaseOrder, Rec, Run, RuleReview, Snapshot } from "./types.ts";
 
 export const hasDb = () => Boolean(process.env.DATABASE_URL);
 
@@ -12,10 +12,11 @@ export async function getSnapshot(): Promise<Snapshot> {
   if (!hasDb()) return demo as unknown as Snapshot;
 
   const sql = neon(process.env.DATABASE_URL!);
-  const [runRows, decisionRows, reviewRows] = await Promise.all([
+  const [runRows, decisionRows, reviewRows, poRows] = await Promise.all([
     sql`select * from runs order by run_at desc limit 40`,
     sql`select d.*, r.name from decisions d left join recommendations r on r.run_id = d.run_id and r.sku = d.sku order by d.decided_at desc limit 500`,
     sql`select * from rule_reviews order by opened_at desc limit 50`,
+    sql`select * from purchase_orders order by created_at desc limit 100`,
   ]);
 
   const runs: Run[] = runRows.map((r) => ({
@@ -57,5 +58,21 @@ export async function getSnapshot(): Promise<Snapshot> {
     proposal: r.proposal, status: r.status,
   }));
 
-  return { demo: false, runs, latestRun, recs, decisions, ruleReviews };
+  return { demo: false, runs, latestRun, recs, decisions, ruleReviews, pos: poRows.map(mapPo) };
+}
+
+function mapPo(p: Record<string, any>): PurchaseOrder { // eslint-disable-line @typescript-eslint/no-explicit-any
+  return {
+    po_number: p.po_number, created_at: iso(p.created_at), vendor_key: p.vendor_key, vendor_name: p.vendor_name ?? null,
+    run_ids: p.run_ids ?? null, created_by: p.created_by ?? null, total_qty: Number(p.total_qty),
+    lines: (typeof p.lines === "string" ? JSON.parse(p.lines) : p.lines) ?? [],
+    delivered_at: p.delivered_at ? iso(p.delivered_at) : null, received_at: p.received_at ? iso(p.received_at) : null,
+  };
+}
+
+export async function getPo(po_number: string): Promise<PurchaseOrder | null> {
+  if (!hasDb()) return ((demo as unknown as Snapshot).pos ?? []).find((p) => p.po_number === po_number) ?? null;
+  const sql = neon(process.env.DATABASE_URL!);
+  const rows = await sql`select * from purchase_orders where po_number = ${po_number}`;
+  return rows.length ? mapPo(rows[0]) : null;
 }
