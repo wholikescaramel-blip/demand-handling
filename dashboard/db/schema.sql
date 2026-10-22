@@ -1,0 +1,87 @@
+-- Idempotent: safe to run repeatedly (npm run db:migrate).
+
+create table if not exists runs (
+  run_id          text primary key,
+  run_at          timestamptz not null,
+  as_of           text,
+  mode            text,
+  status          text not null default 'OK',   -- OK | ABORTED | FAILED
+  skus            integer,
+  completeness    double precision,
+  flagged         integer,
+  healthy         integer,
+  n_reorder       integer not null default 0,
+  n_pause         integer not null default 0,
+  n_manual        integer not null default 0,
+  festival        boolean,
+  gemini_reasons  text,
+  gemini_tokens   integer not null default 0,
+  summary         text,
+  notes           text
+);
+
+create table if not exists recommendations (
+  id            serial primary key,
+  run_id        text not null references runs(run_id) on delete cascade,
+  sku           text not null,
+  name          text,
+  perishable    boolean,
+  action        text not null,                  -- REORDER | PAUSE | MANUAL_REVIEW
+  rec_qty       integer,
+  priority      integer,
+  on_hand       integer,
+  open_po       integer,
+  cover_weeks   double precision,
+  trend_pct     double precision,
+  flags         text,
+  reason        text,
+  reason_source text,                           -- gemini | template
+  data_notes    text,
+  unique (run_id, sku)
+);
+
+create table if not exists decisions (
+  id              serial primary key,
+  decided_at      timestamptz not null,
+  run_id          text not null,
+  sku             text not null,
+  action          text,
+  rec_qty         integer,
+  flags           text,
+  priority        integer,
+  decision        text not null,                -- Approve | Override | Reject | EXPIRED
+  final_qty       integer,
+  reason          text,
+  reviewer        text,
+  hours_to_decide double precision,
+  unique (run_id, sku)
+);
+
+create table if not exists rule_reviews (
+  id         serial primary key,
+  opened_at  timestamptz not null,
+  rule       text not null,
+  changed    integer,
+  total      integer,
+  rate       text,
+  proposal   text,
+  status     text not null default 'OPEN',
+  unique (opened_at, rule)
+);
+
+-- v3: review happens in the dashboard and approved lines become Zoho purchase orders
+alter table runs add column if not exists review_due_at timestamptz;
+
+alter table recommendations add column if not exists distributor_id text;
+alter table recommendations add column if not exists distributor_name text;
+
+alter table decisions add column if not exists po_status text not null default 'NONE';  -- NONE | READY | CREATED | FAILED
+alter table decisions add column if not exists po_number text;
+alter table decisions add column if not exists po_id text;
+alter table decisions add column if not exists po_vendor text;
+alter table decisions add column if not exists po_error text;
+alter table decisions add column if not exists po_created_at timestamptz;
+
+create index if not exists runs_run_at_idx on runs (run_at desc);
+create index if not exists decisions_decided_at_idx on decisions (decided_at desc);
+create index if not exists decisions_po_status_idx on decisions (po_status);

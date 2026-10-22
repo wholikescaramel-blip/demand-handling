@@ -1,0 +1,8 @@
+{
+  "name": "freshroots-demand-planning",
+  "private": true,
+  "description": "Rules engine tests for the Freshroots demand-planning Apps Script build",
+  "scripts": {
+    "test": "node --test tests/engine.test.js"
+  }
+}

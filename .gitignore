@@ -1,0 +1,15 @@
+node_modules
+.next
+.env
+.env.*
+!.env.example
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+.claude
+
+# course material, not part of the build
+*.pdf
+
+# Apps Script project binding (local only)
+.clasp.json
