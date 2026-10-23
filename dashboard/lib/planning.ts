@@ -55,8 +55,19 @@ export async function loadPlanningData(): Promise<{ ok: true; data: PlanningData
   const weeks = [...new Set(salesRows.map((r) => String(r.week)))].sort();
   const window = weeks.slice(-rules.TREND_BASE_WEEKS);
   const inWindow = new Set(window);
-  const present = salesRows.filter((r) => inWindow.has(String(r.week))).length;
-  const ratio = present / (skus.length * window.length);
+  // New SKUs (too little history for the rules) go to a person as manual cards, so they must not drag completeness down.
+  // "New" = started selling inside the window; a SKU that merely lost recent weeks still counts as a gap.
+  const history = new Map<string, number>();
+  const first = new Map<string, string>();
+  for (const r of salesRows) {
+    const id = String(r.sku_id), w = String(r.week);
+    history.set(id, (history.get(id) ?? 0) + 1);
+    if (!first.has(id) || w < first.get(id)!) first.set(id, w);
+  }
+  const isNew = (id: string) => (history.get(id) ?? 0) < rules.MIN_HISTORY_WEEKS && (first.get(id) ?? "") >= window[0];
+  const judged = new Set(skus.filter((k) => !isNew(k.sku_id)).map((k) => k.sku_id));
+  const present = salesRows.filter((r) => inWindow.has(String(r.week)) && judged.has(String(r.sku_id))).length;
+  const ratio = judged.size ? present / (judged.size * window.length) : 0;
   const completeness = Math.round(ratio * 1000) / 10;
 
   const invRows = await sql`

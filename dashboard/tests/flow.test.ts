@@ -160,6 +160,20 @@ test("replace mode empties the dataset first; export round-trips through the imp
   assert.equal(parseDataset("sku_master", skus.csv).rows.length, 15);
 });
 
+test("a brand-new SKU does not block the run: it comes out as a manual card", async () => {
+  await sql`insert into skus (sku_id, name, perishability, std_reorder_qty, distributor_id) values ('NEW001', 'Brand new', 'Low', 200, 'DIST001')`;
+  await sql`insert into sales_weekly (sku_id, week, units) values ('NEW001', '2026-W40', 10), ('NEW001', '2026-W41', 12), ('NEW001', '2026-W42', 15)`;
+  await sql`insert into inventory_snapshots (sku_id, location, units_on_hand, as_of) values ('NEW001', 'Pune Central Warehouse', 20, '2026-10-19')`;
+  await new Promise((r) => setTimeout(r, 1100));
+  const res = await runPlanning("tester");
+  assert.equal(res.ok, true, res.message);
+  const snap = (await getSnapshot())!;
+  assert.equal(snap.recs.find((r) => r.sku === "NEW001")?.action, "MANUAL_REVIEW");
+  await sql`delete from skus where sku_id = 'NEW001'`;
+  await sql`delete from sales_weekly where sku_id = 'NEW001'`;
+  await sql`delete from inventory_snapshots where sku_id = 'NEW001'`;
+});
+
 test("a run with too little sales data stops and says why, producing nothing", async () => {
   await sql`delete from sales_weekly where sku_id in ('SKU001','SKU002','SKU003','SKU004','SKU005','SKU006','SKU007','SKU008') and week >= '2026-W35'`; // a gap in the latest weeks for 8 SKUs
   await new Promise((r) => setTimeout(r, 1100));
