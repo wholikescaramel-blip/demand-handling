@@ -2,21 +2,26 @@
 
 import { useState, type MouseEvent } from "react";
 
+type Mode = "idle" | "edit" | "reject";
+
 /**
- * Approve or Reject one recommendation. The quantity box starts at the recommendation; if Raghav changes it, or rejects,
- * he must say why. The same rules are enforced on the server; this just saves a round trip.
+ * Approve, Edit or Reject one recommendation.
+ *  - Approve: order exactly what the rules recommend (for a pause: skip the order).
+ *  - Edit: order a different quantity; a reason is required.
+ *  - Reject: no order; a reason is required.
+ * The same rules are enforced on the server; this just saves a round trip.
  */
 export function DecisionForm({
-  action, runId, sku, recQty, kind, disabled,
+  action, runId, sku, recQty, kind,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   runId: string;
   sku: string;
-  recQty: number | null; // quantity the rules recommend (0 for a pause, null for a manual review)
+  recQty: number | null; // quantity the rules recommend (null for a manual review)
   kind: "REORDER" | "PAUSE" | "MANUAL_REVIEW";
-  disabled?: boolean;
 }) {
-  const [msg, setMsg] = useState<string>("");
+  const [mode, setMode] = useState<Mode>("idle");
+  const [msg, setMsg] = useState("");
   const base = kind === "PAUSE" ? 0 : recQty;
 
   function guard(button: "Approve" | "Reject", e: MouseEvent<HTMLButtonElement>) {
@@ -41,24 +46,43 @@ export function DecisionForm({
     } else setMsg("");
   }
 
-  const approveLabel = kind === "PAUSE" ? "Approve: skip this order" : "Approve & create PO";
-  const qtyLabel = kind === "PAUSE" ? "Order anyway? (0 = skip)" : kind === "MANUAL_REVIEW" ? "Quantity to order" : "Quantity to order";
+  const go = (m: Mode) => { setMode(m); setMsg(""); };
+  const approveLabel = kind === "PAUSE" ? "Approve: skip this order" : "Approve";
+  const editLabel = kind === "PAUSE" ? "Order anyway" : kind === "MANUAL_REVIEW" ? "Set quantity" : "Edit";
 
   return (
     <form action={action} className="decide">
       <input type="hidden" name="run_id" value={runId} />
       <input type="hidden" name="sku" value={sku} />
-      <label className="small dim">
-        {qtyLabel}
-        <input name="qty" type="number" min={0} step={1} inputMode="numeric" defaultValue={base ?? ""} placeholder={base === null ? "your call" : ""} disabled={disabled} onFocus={(e) => e.currentTarget.select()} />
+
+      {/* the quantity box always exists so Approve sends the recommended quantity; it is only shown while editing */}
+      <label className="small dim" hidden={mode !== "edit"}>
+        Quantity to order
+        <input name="qty" type="number" min={0} step={1} inputMode="numeric" defaultValue={base ?? ""} placeholder={base === null ? "your call" : ""} onFocus={(e) => e.currentTarget.select()} />
       </label>
-      <label className="small dim grow">
-        Reason (needed to reject, or if you change the quantity)
-        <input name="reason" type="text" maxLength={300} placeholder="e.g. distributor scheme starting Monday" disabled={disabled} />
+      <label className="small dim grow" hidden={mode === "idle"}>
+        {mode === "reject" ? "Why are you rejecting it?" : "Why are you changing the quantity?"}
+        <input name="reason" type="text" maxLength={300} placeholder="e.g. distributor scheme starting Monday" />
       </label>
+
       <div className="btns">
-        <button className="btn ok" type="submit" name="decision" value="Approve" disabled={disabled} onClick={(e) => guard("Approve", e)}>{approveLabel}</button>
-        <button className="btn bad" type="submit" name="decision" value="Reject" disabled={disabled} onClick={(e) => guard("Reject", e)}>Reject</button>
+        {mode === "idle" ? (
+          <>
+            {kind !== "MANUAL_REVIEW" ? <button className="btn ok" type="submit" name="decision" value="Approve" onClick={(e) => guard("Approve", e)}>{approveLabel}</button> : null}
+            <button className="btn" type="button" onClick={() => go("edit")}>{editLabel}</button>
+            <button className="btn bad" type="button" onClick={() => go("reject")}>Reject</button>
+          </>
+        ) : mode === "edit" ? (
+          <>
+            <button className="btn ok" type="submit" name="decision" value="Approve" onClick={(e) => guard("Approve", e)}>Save and approve</button>
+            <button className="btn" type="button" onClick={() => go("idle")}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <button className="btn bad" type="submit" name="decision" value="Reject" onClick={(e) => guard("Reject", e)}>Confirm reject</button>
+            <button className="btn" type="button" onClick={() => go("idle")}>Cancel</button>
+          </>
+        )}
       </div>
       {msg ? <p className="err" role="alert" style={{ flexBasis: "100%", margin: 0 }}>{msg}</p> : null}
     </form>

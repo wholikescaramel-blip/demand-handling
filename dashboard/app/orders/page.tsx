@@ -21,7 +21,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     <>
       <h1>Purchase orders</h1>
       <p className="sub">
-        Every approval creates one numbered PO. Download it, or email it to the vendor from here. Nothing is created without Raghav pressing Approve.
+        Every approval creates one numbered PO. Download it, or email it to the vendor from here. Nothing is created without Raghav or Deepa approving.
       </p>
 
       {error ? <div className="banner bad" role="alert">{error}</div> : null}
@@ -86,7 +86,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             </div>
           </section>
         ))}
-        {!snap.pos.length ? <section className="card"><p className="dim" style={{ margin: 0 }}>No purchase orders yet. Approve a recommendation on the Review page and its PO appears here.</p></section> : null}
+        {!snap.pos.length ? <section className="card"><p className="dim" style={{ margin: 0 }}>No purchase orders yet. Approve a recommendation on the Review tab and its PO appears here.</p></section> : null}
       </div>
     </>
   );

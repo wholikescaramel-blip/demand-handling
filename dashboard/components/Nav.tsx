@@ -2,32 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ReviewerSelect } from "./ReviewerSelect";
 
 const LINKS = [
   { href: "/", label: "Overview" },
+  { href: "/stock", label: "Stock" },
   { href: "/review", label: "Review" },
   { href: "/orders", label: "Purchase orders" },
-  { href: "/data", label: "Data" },
-  { href: "/rules", label: "Rules" },
-  { href: "/impact", label: "Impact" },
-  { href: "/decisions", label: "Review log" },
 ];
 
-export function Nav() {
+export function Nav({ reviewer }: { reviewer: string | null }) {
   const path = usePathname();
-  if (path === "/login") return null;
   return (
     <header className="nav">
       <nav className="nav-inner" aria-label="Main">
-        <span className="brand">
-          <span className="logo" aria-hidden="true">🌱</span>
-          Freshroots<small>Planning Desk</small>
-        </span>
+        <span className="brand">Freshroots</span>
         {LINKS.map((l) => (
           <Link key={l.href} href={l.href} aria-current={path === l.href ? "page" : undefined}>
             {l.label}
           </Link>
         ))}
+        <span className="spacer" />
+        <ReviewerSelect current={reviewer} />
       </nav>
     </header>
   );

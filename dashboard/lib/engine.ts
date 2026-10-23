@@ -215,6 +215,62 @@ export function runEngine(input: EngineInput): EngineResult {
   return { recs, healthy, festival, anomalies, asOf: input.asOf, skuCount: input.skus.length };
 }
 
+export type StockStatus = "STOCKOUT" | "OVERSTOCK" | "HIGH_DEMAND" | "OK" | "NEW" | "NO_DATA";
+
+export type StockRow = {
+  sku: string;
+  name: string;
+  perishable: boolean;
+  distributor: string | null;
+  onHand: number | null;
+  openPo: number; // units already on order
+  weeklyDemand: number | null; // average weekly sales, raised by the festival uplift in a festival month
+  coverWeeks: number | null; // (on hand + on order) / weekly demand
+  floorWeeks: number; // target band: lowest acceptable weeks of cover
+  ceilingWeeks: number; // target band: highest acceptable weeks of cover
+  trendPct: number | null;
+  status: StockStatus;
+  priority: number; // 0 when nothing needs doing
+  action: Action | null; // what the rules recommend, if anything
+  recQty: number | null;
+  unitsToFloor: number; // units short of the lowest acceptable cover
+  unitsOverCeiling: number; // units above the highest acceptable cover
+};
+
+/** Every SKU with its stock position against its target band, most urgent first. Same maths as the planning run. */
+export function stockRows(input: EngineInput): StockRow[] {
+  const { rules } = input;
+  const festival = isFestivalMonth(input.calendar, input.asOf);
+  const idx = buildSalesIndex(input.sales);
+  const rows = input.skus.map((sku): StockRow => {
+    const units = (idx[sku.sku_id] ?? []).map((h) => h.units);
+    const perishable = sku.perishability === "High";
+    const floor = perishable ? rules.PERISHABLE_MIN_WEEKS : rules.STOCKOUT_WEEKS;
+    const ceiling = perishable ? rules.PERISHABLE_MAX_WEEKS : rules.OVERSTOCK_WEEKS;
+    const onHand = Object.prototype.hasOwnProperty.call(input.inventory, sku.sku_id) ? Number(input.inventory[sku.sku_id]) : null;
+    const openPo = Number(input.openPos[sku.sku_id] ?? 0);
+    const base = { sku: sku.sku_id, name: sku.name, perishable, distributor: sku.distributor_id, onHand, openPo, floorWeeks: floor, ceilingWeeks: ceiling, unitsToFloor: 0, unitsOverCeiling: 0 };
+    const none = (status: StockStatus): StockRow => ({ ...base, weeklyDemand: null, coverWeeks: null, trendPct: null, status, priority: 50, action: ACTIONS.MANUAL, recQty: null });
+
+    if (units.length < rules.MIN_HISTORY_WEEKS) return none("NEW");
+    if (onHand === null) return none("NO_DATA");
+    const avg12 = mean(units.slice(-rules.TREND_BASE_WEEKS));
+    if (avg12 <= 0) return none("NO_DATA");
+
+    const avg4 = mean(units.slice(-rules.TREND_RECENT_WEEKS));
+    const demand = avg12 * (festival ? 1 + rules.FESTIVAL_UPLIFT : 1);
+    const supply = onHand + (rules.USE_OPEN_POS ? openPo : 0);
+    const rec = evaluateSku(sku, idx[sku.sku_id] ?? [], onHand, openPo, festival, rules, []);
+    const status: StockStatus = !rec ? "OK" : rec.flags.includes("STOCKOUT_RISK") ? "STOCKOUT" : rec.flags.includes("OVERSTOCK_RISK") ? "OVERSTOCK" : "HIGH_DEMAND";
+    return {
+      ...base, weeklyDemand: round(demand, 1), coverWeeks: round(supply / demand, 1), trendPct: round((avg4 / avg12 - 1) * 100, 1), status,
+      priority: rec?.priority ?? 0, action: rec?.action ?? null, recQty: rec?.qty ?? null,
+      unitsToFloor: Math.max(0, Math.ceil(floor * demand - supply)), unitsOverCeiling: Math.max(0, Math.floor(supply - ceiling * demand)),
+    };
+  });
+  return rows.sort((a, b) => b.priority - a.priority || (a.coverWeeks ?? 1e9) - (b.coverWeeks ?? 1e9) || (a.sku < b.sku ? -1 : 1));
+}
+
 /** Deterministic plain-English reason. Used as the fallback whenever Gemini is unavailable or fails its number check. */
 export function templateReason(rec: Rec, rules: Rules): string {
   if (rec.flags.some((f) => ["SHORT_HISTORY", "NO_INVENTORY", "NO_SALES"].includes(f))) return rec.notes[0];

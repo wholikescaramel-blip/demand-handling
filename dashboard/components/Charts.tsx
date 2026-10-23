@@ -32,7 +32,7 @@ export function RunsChart({ data }: { data: RunPoint[] }) {
 }
 
 export function ChangeRateChart({ data, kill }: { data: WeekPoint[]; kill: number }) {
-  if (!data.length) return <p className="dim">No review decisions yet. They appear after the first Finalise in the Sheet.</p>;
+  if (!data.length) return <p className="dim">No review decisions yet. They appear once Raghav or Deepa decide the first recommendation.</p>;
   const rows = data.map((d) => ({ ...d, pct: Math.round(d.rate * 100) }));
   return (
     <div role="img" aria-label="Line chart of the weekly override and reject rate against the 40 percent line" style={{ width: "100%", height: 260 }}>

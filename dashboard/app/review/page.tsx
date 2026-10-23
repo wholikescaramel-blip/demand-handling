@@ -4,7 +4,7 @@ import { ActionPill, DecisionPill, PoPill, fmtDateTime } from "@/components/ui";
 import { DecisionForm } from "@/components/DecisionForm";
 import { PoActions } from "@/components/PoActions";
 import { NotConnected } from "@/components/NotConnected";
-import { createPoForLine, decide, runPlanningNow } from "./actions";
+import { createPoForLine, decide } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,21 +36,14 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1>Review</h1>
-          <p className="sub" style={{ marginBottom: 12 }}>
-            {run ? (
-              <>Run {run.run_id} · stock as of {run.as_of} · {live ? (run.review_due_at ? `decide by ${fmtDateTime(run.review_due_at)}` : "waiting for your decisions") : "shadow mode: nothing to decide"}</>
-            ) : (
-              "No planning run yet. Press Run planning to apply the rules to the data in Neon."
-            )}
-          </p>
-        </div>
-        <form action={runPlanningNow}>
-          <button className="btn primary" type="submit">Run planning now</button>
-        </form>
-      </div>
+      <h1>Review</h1>
+      <p className="sub">
+        {run ? (
+          <>Run {run.run_id} · stock as of {run.as_of} · {live ? (run.review_due_at ? `decide by ${fmtDateTime(run.review_due_at)}` : "waiting for decisions") : "shadow mode: nothing to decide"}</>
+        ) : (
+          "No planning run yet. Press Run planning now on the Overview tab."
+        )}
+      </p>
 
       {error ? <div className="banner bad" role="alert">{error}</div> : null}
       {ok ? <div className="banner good" role="status">{ok}</div> : null}
@@ -58,7 +51,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       {run && !live ? (
         <section className="card">
           <p style={{ margin: 0 }}>
-            This run was made in <strong>shadow mode</strong>, so it was logged but not sent for review. Turn shadow mode off on the Rules page, then run planning again.
+            This run was made in <strong>shadow mode</strong>, so it was logged but not sent for review. Set SHADOW_MODE to false in the Neon rules table, then run planning again.
           </p>
         </section>
       ) : null}
@@ -67,8 +60,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <section style={{ marginBottom: 18 }}>
           <h2 className="sectiontitle">Waiting for your decision ({pending.length})</h2>
           <p className="small dim" style={{ marginTop: -4 }}>
-            The rules only recommend. Nothing is ordered until you press Approve. The quantity box starts at the recommendation; change it if you
-            know better. Rejecting needs a reason.
+            The rules only recommend. Nothing is ordered until Raghav or Deepa decides. Approve orders the recommended quantity, Edit lets you change it (with a reason), Reject orders nothing (with a reason).
           </p>
           {!pending.length ? <div className="card"><p className="dim" style={{ margin: 0 }}>Nothing waiting. Everything in this run has a decision.</p></div> : null}
           <div className="reviewlist">
@@ -139,6 +131,30 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             })}
           </div>
         </section>
+      ) : null}
+    
+      {snap.decisions.length ? (
+        <details className="card" style={{ marginTop: 18 }}>
+          <summary>Full decision history ({snap.decisions.length})</summary>
+          <div className="tablewrap" style={{ marginTop: 10 }}>
+            <table>
+              <thead><tr><th>When</th><th>SKU</th><th>Rules said</th><th>Decision</th><th className="num">Qty</th><th>Reason</th><th>By</th></tr></thead>
+              <tbody>
+                {snap.decisions.map((d) => (
+                  <tr key={`${d.run_id}-${d.sku}-${d.decided_at}`}>
+                    <td className="small">{fmtDateTime(d.decided_at)}</td>
+                    <td><strong>{d.sku}</strong><div className="small dim">{d.name}</div></td>
+                    <td className="small">{d.action ?? "—"}{d.rec_qty != null ? ` ${d.rec_qty}` : ""}</td>
+                    <td><DecisionPill decision={d.decision} /></td>
+                    <td className="num">{d.final_qty ?? "—"}</td>
+                    <td className="small">{d.reason}</td>
+                    <td className="small">{d.reviewer}{d.po_number ? <div className="dim">{d.po_number}</div> : null}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       ) : null}
     </>
   );

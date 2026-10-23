@@ -2,16 +2,11 @@
 export function NotConnected() {
   return (
     <section className="card" style={{ maxWidth: 720, marginTop: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Connect the database to begin</h1>
+      <h1 style={{ marginTop: 0 }}>Database not connected</h1>
       <p>
-        This dashboard keeps everything in a Neon database: the SKUs, sales, stock, rules, recommendations, decisions and purchase orders. It is not
-        connected yet.
+        Everything (SKUs, sales, stock, rules, recommendations, decisions, purchase orders) lives in the Neon database, and the dashboard cannot
+        reach it. Check that <code>DATABASE_URL</code> is set in the Vercel project (pooled connection string) and redeploy.
       </p>
-      <ol style={{ paddingLeft: 20 }}>
-        <li>In Neon, copy the <strong>pooled connection string</strong> (Connect &gt; Connection pooling on).</li>
-        <li>In the Vercel project add it as <code>DATABASE_URL</code>, together with <code>DASHBOARD_PASSWORD</code> (the team password).</li>
-        <li>Redeploy. The build creates the tables by itself. Then open <strong>Data</strong> and upload your CSV files.</li>
-      </ol>
     </section>
   );
 }

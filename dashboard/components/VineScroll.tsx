@@ -8,7 +8,6 @@ const D = Array.from({ length: 51 }, (_, i) => {
   const x = 23 + 9 * Math.sin(y / 62);
   return `${i ? "L" : "M"}${x.toFixed(1)},${y}`;
 }).join(" ");
-const LEAF_AT = [8, 19, 30, 41, 52, 63, 74, 85, 95];
 
 const clamp = (n: number) => Math.min(1, Math.max(0, n));
 
@@ -60,12 +59,7 @@ export function VineScroll() {
         <path d={D} className="vine-ghost" />
         <path d={D} className="vine-grow" pathLength={1} style={{ strokeDashoffset: 1 - p }} />
       </svg>
-      {LEAF_AT.map((y, i) => (
-        <span key={y} className={`vleaf ${i % 2 ? "r" : "l"}${p * 100 >= y ? " on" : ""}`} style={{ top: `${y}%` }}>
-          🍃
-        </span>
-      ))}
-      <span className="vtip" style={{ top: `${p * 100}%` }}>🌱</span>
+      <span className="vtip" style={{ top: `${p * 100}%` }} />
     </div>
   );
 }

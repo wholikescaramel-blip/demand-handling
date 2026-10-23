@@ -1,9 +1,9 @@
 /**
- * The planning run: read everything from Neon, apply Raghav's rules, let Gemini word the reasons, and write the
- * recommendations back for Raghav to approve. This is what the "Run planning" button and the Tuesday/Friday cron call.
+ * Reading everything the rules need out of Neon, and the planning run itself: apply Raghav's rules, let Gemini word the
+ * reasons, and write the recommendations back for Raghav and Deepa to review. The Stock page reads the same data live.
  */
 import { getSql } from "./db.ts";
-import { runEngine, type EngineResult, type EngineSku } from "./engine.ts";
+import { runEngine, stockRows, type EngineInput, type EngineResult, type EngineSku, type StockRow } from "./engine.ts";
 import { explainRecs, geminiConfigured, summarizeRun } from "./gemini.ts";
 import { generatePosForReady } from "./orders.ts";
 import { aggregateOpenQty } from "./po.ts";
@@ -22,25 +22,23 @@ const istParts = () => {
   return { date: `${p.year}-${p.month}-${p.day}`, stamp: `${p.year}${p.month}${p.day}-${p.hour}${p.minute}${p.second}` };
 };
 
-async function abort(runId: string, by: string, message: string, extra: { completeness?: number | null; asOf?: string | null } = {}): Promise<PlanningResult> {
-  await getSql()`
-    insert into runs (run_id, run_at, as_of, mode, status, completeness, notes, triggered_by)
-    values (${runId}, now(), ${extra.asOf ?? null}, null, 'ABORTED', ${extra.completeness ?? null}, ${message}, ${by})
-    on conflict (run_id) do nothing`;
-  return { ok: false, runId, mode: null, flagged: 0, message };
-}
+export type PlanningData = {
+  input: EngineInput;
+  distName: Map<string, string | null>;
+  completeness: number; // percent of SKU x week sales cells present over the baseline window
+  enough: boolean; // completeness is at or above the rule's minimum
+  windowWeeks: number;
+};
 
-export async function runPlanning(by: string, fetcher: typeof fetch = fetch): Promise<PlanningResult> {
+/** Everything the engine needs, or a plain-English reason why it cannot run yet. */
+export async function loadPlanningData(): Promise<{ ok: true; data: PlanningData } | { ok: false; message: string; completeness?: number | null; asOf?: string | null }> {
   const sql = getSql();
-  const now = istParts();
-  const runId = `R${now.stamp}`;
   const rules = await loadRules();
 
-  // ---- master data
   const skuRows = await sql`
     select s.sku_id, s.name, s.category, s.perishability, s.std_reorder_qty, s.unit, s.distributor_id, s.hsn, s.unit_cost, s.tax_pct, d.name as distributor_name
     from skus s left join distributors d on d.distributor_id = s.distributor_id where s.active order by s.sku_id`;
-  if (!skuRows.length) return abort(runId, by, "There are no SKUs yet. Add SKUs or upload sku_master.csv on the Data page.");
+  if (!skuRows.length) return { ok: false, message: "There are no SKUs in the database yet." };
   const skus: EngineSku[] = skuRows.map((r) => ({
     sku_id: String(r.sku_id), name: String(r.name), category: r.category ?? null, perishability: String(r.perishability), std_reorder_qty: Number(r.std_reorder_qty),
     distributor_id: r.distributor_id ?? null, unit: r.unit ?? null, hsn: r.hsn ?? null,
@@ -48,31 +46,23 @@ export async function runPlanning(by: string, fetcher: typeof fetch = fetch): Pr
   }));
   const distName = new Map(skuRows.map((r) => [String(r.sku_id), (r.distributor_name as string | null) ?? null]));
 
-  // ---- sales (latest 130 weeks per SKU is plenty) and the completeness check on the baseline window
   const salesRows = await sql`
     select t.sku_id, t.week, t.units from (
       select s.sku_id, s.week, s.units, row_number() over (partition by s.sku_id order by s.week desc) as rn
       from sales_weekly s join skus k on k.sku_id = s.sku_id and k.active
     ) t where t.rn <= 130`;
-  if (!salesRows.length) return abort(runId, by, "There is no sales data yet. Upload weekly_sales.csv on the Data page.");
+  if (!salesRows.length) return { ok: false, message: "There is no sales data in the database yet." };
   const weeks = [...new Set(salesRows.map((r) => String(r.week)))].sort();
   const window = weeks.slice(-rules.TREND_BASE_WEEKS);
   const inWindow = new Set(window);
   const present = salesRows.filter((r) => inWindow.has(String(r.week))).length;
-  const completeness = Math.round((present / (skus.length * window.length)) * 1000) / 10;
-  if (present / (skus.length * window.length) < rules.COMPLETENESS_MIN) {
-    return abort(
-      runId, by,
-      `Sales data is only ${completeness}% complete over the latest ${window.length} weeks (needs ${Math.round(rules.COMPLETENESS_MIN * 100)}%). Nothing was produced. Check weekly_sales.csv on the Data page.`,
-      { completeness },
-    );
-  }
+  const ratio = present / (skus.length * window.length);
+  const completeness = Math.round(ratio * 1000) / 10;
 
-  // ---- stock: latest snapshot per SKU and location, summed over locations
   const invRows = await sql`
     select distinct on (sku_id, location) sku_id, location, units_on_hand, as_of::text as as_of
     from inventory_snapshots order by sku_id, location, as_of desc`;
-  if (!invRows.length) return abort(runId, by, "There is no stock data yet. Upload current_inventory.csv on the Data page.", { completeness });
+  if (!invRows.length) return { ok: false, message: "There is no stock data in the database yet.", completeness };
   const inventory: Record<string, number> = {};
   let asOf = "";
   for (const r of invRows) {
@@ -89,13 +79,56 @@ export async function runPlanning(by: string, fetcher: typeof fetch = fetch): Pr
     openDays,
   )) openPos[o.sku] = o.qty_on_order;
 
+  return {
+    ok: true,
+    data: {
+      input: {
+        sales: salesRows.map((r) => ({ sku: String(r.sku_id), week: String(r.week), units: Number(r.units) })),
+        skus, inventory, openPos,
+        calendar: calRows.map((c) => ({ year_month: String(c.year_month), is_festival: Boolean(c.is_festival) })),
+        rules, asOf, today: istParts().date,
+      },
+      distName, completeness, enough: ratio >= rules.COMPLETENESS_MIN, windowWeeks: window.length,
+    },
+  };
+}
+
+/** Every SKU with its stock position, most urgent first. For the Stock page. */
+export async function loadStock(): Promise<{ ok: true; rows: StockRow[]; asOf: string; festival: boolean; completeness: number; rules: Rules; distName: Map<string, string | null> } | { ok: false; message: string }> {
+  const r = await loadPlanningData();
+  if (!r.ok) return r;
+  const { input, completeness, distName } = r.data;
+  const festival = runEngine({ ...input, skus: [] }).festival;
+  return { ok: true, rows: stockRows(input), asOf: input.asOf, festival, completeness, rules: input.rules, distName };
+}
+
+async function abort(runId: string, by: string, message: string, extra: { completeness?: number | null; asOf?: string | null } = {}): Promise<PlanningResult> {
+  await getSql()`
+    insert into runs (run_id, run_at, as_of, mode, status, completeness, notes, triggered_by)
+    values (${runId}, now(), ${extra.asOf ?? null}, null, 'ABORTED', ${extra.completeness ?? null}, ${message}, ${by})
+    on conflict (run_id) do nothing`;
+  return { ok: false, runId, mode: null, flagged: 0, message };
+}
+
+export async function runPlanning(by: string, fetcher: typeof fetch = fetch): Promise<PlanningResult> {
+  const sql = getSql();
+  const now = istParts();
+  const runId = `R${now.stamp}`;
+
+  const loaded = await loadPlanningData();
+  if (!loaded.ok) return abort(runId, by, loaded.message, { completeness: loaded.completeness });
+  const { input, distName, completeness, enough, windowWeeks } = loaded.data;
+  const { rules, skus, asOf } = input;
+  if (!enough) {
+    return abort(
+      runId, by,
+      `Sales data is only ${completeness}% complete over the latest ${windowWeeks} weeks (needs ${Math.round(rules.COMPLETENESS_MIN * 100)}%). Nothing was produced.`,
+      { completeness },
+    );
+  }
+
   // ---- the rules
-  const result: EngineResult = runEngine({
-    sales: salesRows.map((r) => ({ sku: String(r.sku_id), week: String(r.week), units: Number(r.units) })),
-    skus, inventory, openPos,
-    calendar: calRows.map((c) => ({ year_month: String(c.year_month), is_festival: Boolean(c.is_festival) })),
-    rules, asOf, today: now.date,
-  });
+  const result: EngineResult = runEngine(input);
 
   // ---- Gemini words the reasons (optional); numbers are checked, template wording is the fallback
   const expl = await explainRecs(result.recs, rules, fetcher);
@@ -109,7 +142,6 @@ export async function runPlanning(by: string, fetcher: typeof fetch = fetch): Pr
   if (!result.recs.length) notes.push("Nothing needed attention.");
   if (result.recs.some((r) => r.dq.length)) notes.push(result.recs[0].dq.join("; "));
   if (expl.error && geminiConfigured()) notes.push(`Gemini: ${expl.error}`);
-  const dueHours = rules.REVIEW_SLA_HOURS;
 
   await sql`
     insert into runs (run_id, run_at, as_of, mode, status, skus, completeness, flagged, healthy, n_reorder, n_pause, n_manual, festival,
@@ -117,7 +149,7 @@ export async function runPlanning(by: string, fetcher: typeof fetch = fetch): Pr
     values (${runId}, now(), ${asOf}, ${mode}, 'OK', ${skus.length}, ${completeness}, ${result.recs.length}, ${result.healthy},
             ${count("REORDER")}, ${count("PAUSE")}, ${count("MANUAL_REVIEW")}, ${result.festival},
             ${geminiConfigured() ? `${geminiCount}/${result.recs.length}` : null}, ${summary}, ${notes.join(" | ") || null},
-            now() + (${dueHours} * interval '1 hour'), ${by})
+            now() + (${rules.REVIEW_SLA_HOURS} * interval '1 hour'), ${by})
     on conflict (run_id) do nothing`;
 
   const payload = result.recs.map((r) => ({

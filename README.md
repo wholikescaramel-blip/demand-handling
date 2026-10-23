@@ -8,15 +8,14 @@ Components map: `docs/demand_planning_components_map_v6.png`. Sample PO: `docs/s
 
 ## What each page does
 
-| Page | What you do there |
+| Tab | What you do there |
 |---|---|
-| **Overview** | Numbers at a glance, the guardrails, the latest recommendations. **Run planning now** applies the rules to what is in Neon. |
-| **Review** | One card per flagged SKU with the metrics (stock, weeks of cover, trend, which rule fired). **Approve** (the quantity box starts at the recommendation and is editable; changing it needs a reason) or **Reject** (reason needed). Approve creates the PO right away, with **Download PDF** and **Send by email**. |
+| **Overview** | Numbers at a glance, guardrails, charts, and the **Impact** section (weekly losses vs the pre-AI baseline, day-90 verdict, a small form to add a week). A **Rules and thresholds** dropdown shows every number in use (read only). **Run planning now** applies the rules to what is in Neon. |
+| **Stock** | Every SKU, most urgent first: in hand, on order, demand per week, weeks of cover against its target band, status and the gap in units. |
+| **Review** | For Raghav and Deepa (pick your name in the top bar; there is no login). Each flagged SKU has **Approve**, **Edit** (change the quantity, reason needed) or **Reject** (reason needed). Approve creates the PO right away. The full decision history is below. |
 | **Purchase orders** | Every PO: preview, download, email, mark received. |
-| **Data** | Upload a CSV for any dataset (add/update rows, or replace everything), download what is there now or a blank template, and open **Manage SKUs** / **Manage distributors** to add, edit or remove single items. |
-| **Rules** | Edit every threshold (the five rules, the windows, shadow mode, the kill line, data checks). Also the queue of rules that are changed too often. |
-| **Impact** | Weekly losses vs the pre-AI baseline, graphs, and the day-90 keep / review / go-back-to-manual verdict. |
-| **Review log** | Every decision with its reason. |
+
+Data (SKUs, sales, stock, distributors) and the rule numbers are maintained in Neon by the backend (`npm run seed` loads the CSVs), not in the dashboard.
 
 ## How a run works
 
@@ -24,7 +23,7 @@ Components map: `docs/demand_planning_components_map_v6.png`. Sample PO: `docs/s
 2. It refuses to run if sales data is less than 95% complete over the baseline window, and says so on screen.
 3. Raghav's rules give one recommendation per SKU (reorder, pause, or manual review) with a priority score. SKUs with under 12 weeks of history, and SKUs whose signals conflict, go to Raghav as a manual review.
 4. Gemini words a one-line reason for each (optional). Any reply containing a number the rules did not produce is thrown away and the standard wording is used.
-5. The recommendations wait on the Review page. Nothing is ordered until Raghav approves. Undecided cards expire when the next run arrives.
+5. The recommendations wait on the Review tab. Nothing is ordered until Raghav or Deepa approves. Undecided cards expire when the next run arrives.
 
 ## Setup
 
@@ -34,7 +33,6 @@ Components map: `docs/demand_planning_components_map_v6.png`. Sample PO: `docs/s
 | Variable | Needed? | What it is |
 |---|---|---|
 | `DATABASE_URL` | yes | Neon connection string |
-| `DASHBOARD_PASSWORD` | yes | The team password for the login page. With a database but no password the site refuses to load. |
 | `CRON_SECRET` | for the schedule | Any long random string; lets Vercel's Tue/Fri cron call `/api/cron/run` |
 | `GEMINI_API_KEY` | optional | Gemini words the reasons. Without it the standard wording is used. |
 | `SMTP_USER`, `SMTP_PASS` | optional | Email POs from the dashboard. Gmail: an app password (Google account > Security > 2-Step Verification > App passwords). Without them, Download still works. |
@@ -63,7 +61,7 @@ Title, company block, supplier panel (name, address, GSTIN, contact, email, supp
 
 ## Re-evaluating the rules
 
-The thresholds are Raghav's and never change by themselves. Every quantity change and every rejection is logged with its reason and the rule that fired. When one rule is changed or rejected `Open a rule review after this many changes` times (3) within 28 days, it appears under **Rules waiting for a second look**. Gemini can draft a short suggestion from Raghav's own reasons; Raghav and Deepa decide whether to edit the number on the Rules page. If more than **60%** of decisions have a changed quantity or are rejected for four straight weeks, the rules do not match Raghav's judgement: that is the adoption kill criterion.
+The thresholds are Raghav's and never change by themselves. Every quantity change and every rejection is logged with its reason and the rule that fired. When one rule is changed or rejected `Open a rule review after this many changes` times (3) within 28 days, it appears under **Waiting for a second look** in the Overview rules dropdown. Gemini can draft a short suggestion from Raghav's own reasons; Raghav and Deepa decide whether to edit the number in the Neon `rules` table. If more than **60%** of decisions have a changed quantity or are rejected for four straight weeks, the rules do not match Raghav's judgement: that is the adoption kill criterion.
 
 ## Impact and the day-90 kill switch
 
@@ -81,5 +79,5 @@ Finance enters one row per week (stockout losses, overstock write-offs, the peri
 
 - The sample is 15 SKUs and 16 weeks. The backtest and baselines need the full SAP export and Raghav's past recommendations.
 - Loss numbers for Impact come from finance by hand: the sales and stock data carry no prices.
-- The shared password is fine for a project; real use should move to per-user sign-in.
+- The dashboard is open (no login); anyone with the link can approve. Real use needs sign-in.
 - The planning run is capped by Vercel's function time (60 s), which is ample for hundreds of SKUs.

@@ -141,3 +141,34 @@ test("rules: stored values override defaults, bad values are ignored, input is v
   assert.equal(parseRuleInput(weeks, "12.5").ok, false);
   assert.ok(checkRules({ ...defaultRules(), STOCKOUT_WEEKS: 20 }).length > 0);
 });
+
+import { stockRows } from "../lib/engine.ts";
+
+test("stock rows: every SKU appears, most urgent first, with cover against its band", () => {
+  const input: EngineInput = { sales, skus, inventory, openPos: {}, calendar, rules: defaultRules(), asOf: "2026-10-19", today: "2026-10-22" };
+  const rows = stockRows(input);
+  assert.equal(rows.length, 15);
+  // flagged SKUs come first, in the same order as the planning run's priority
+  const flagged = rows.filter((r) => r.priority > 0).map((r) => r.sku);
+  assert.deepEqual(flagged, runEngine(input).recs.map((r) => r.sku));
+  assert.ok(rows.slice(0, flagged.length).every((r) => r.priority > 0) && rows.slice(flagged.length).every((r) => r.priority === 0));
+
+  const by = Object.fromEntries(rows.map((r) => [r.sku, r]));
+  assert.equal(by.SKU001.status, "STOCKOUT");
+  assert.equal(by.SKU001.onHand, 900);
+  assert.equal(by.SKU001.coverWeeks, 3.4); // festival-adjusted demand
+  assert.deepEqual([by.SKU001.floorWeeks, by.SKU001.ceilingWeeks], [6, 14]);
+  assert.ok(by.SKU001.unitsToFloor > 0 && by.SKU001.unitsOverCeiling === 0);
+  assert.equal(by.SKU006.status, "OVERSTOCK");
+  assert.ok(by.SKU006.unitsOverCeiling > 0 && by.SKU006.unitsToFloor === 0);
+  assert.equal(by.SKU005.status, "OK");
+  assert.deepEqual([by.SKU004.floorWeeks, by.SKU004.ceilingWeeks], [3, 4]); // perishable band
+});
+
+test("stock rows: a new SKU or one with no stock record is marked, not guessed", () => {
+  const short = { ...({ sales: sales.filter((s) => s.sku !== "SKU005" || s.week >= "2026-W40") } as Partial<EngineInput>) };
+  const rows = stockRows({ sales, skus, inventory: { ...inventory, SKU009: undefined as unknown as number }, openPos: {}, calendar, rules: defaultRules(), asOf: "2026-10-19", ...short });
+  const by = Object.fromEntries(rows.map((r) => [r.sku, r]));
+  assert.equal(by.SKU005.status, "NEW");
+  assert.equal(by.SKU005.coverWeeks, null);
+});

@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { currentReviewer } from "@/lib/reviewer";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { dbConfigured, getSql } from "@/lib/db";
@@ -13,20 +13,20 @@ import { mailConfigured, sendMail, validEmail } from "@/lib/mail";
 
 const back = (params: Record<string, string>) => `/review?${new URLSearchParams(params).toString()}`;
 
-async function userName(): Promise<string> {
-  return ((await cookies()).get("dp_user")?.value || "reviewer").slice(0, 60);
-}
+const NO_REVIEWER = "Choose who is reviewing (Raghav or Deepa) in the top bar first.";
 
 function refresh() {
-  for (const p of ["/", "/review", "/orders", "/decisions", "/rules"]) revalidatePath(p);
+  for (const p of ["/", "/stock", "/review", "/orders"]) revalidatePath(p);
 }
 
 /** Raghav presses Approve or Reject on one card. Approve creates that line's PO right away. */
 export async function decide(formData: FormData) {
   const sku = String(formData.get("sku") ?? "");
+  const reviewer = await currentReviewer();
+  if (!reviewer) redirect(back({ error: NO_REVIEWER, sku }));
   const out = await recordDecision({
     run_id: String(formData.get("run_id") ?? ""), sku, button: String(formData.get("decision") ?? ""),
-    qty: String(formData.get("qty") ?? ""), reason: String(formData.get("reason") ?? ""), reviewer: await userName(),
+    qty: String(formData.get("qty") ?? ""), reason: String(formData.get("reason") ?? ""), reviewer: reviewer!,
   });
   refresh();
   redirect(out.ok ? back({ ok: out.message }) : back({ error: out.error, sku }));
@@ -34,9 +34,11 @@ export async function decide(formData: FormData) {
 
 /** Pull the latest data from Neon, apply the rules, and put the recommendations in front of Raghav. */
 export async function runPlanningNow() {
-  const r = await runPlanning(await userName());
+  const reviewer = await currentReviewer();
+  if (!reviewer) redirect("/?error=" + encodeURIComponent(NO_REVIEWER));
+  const r = await runPlanning(reviewer!);
   refresh();
-  redirect(r.ok ? back({ ok: `New run ${r.runId}: ${r.message}` }) : back({ error: r.message }));
+  redirect(r.ok ? `/review?${new URLSearchParams({ ok: `New run ${r.runId}: ${r.message}` })}` : "/?error=" + encodeURIComponent(r.message));
 }
 
 /** Retry the PO for every approved line that is still waiting (only needed if creating one failed). */

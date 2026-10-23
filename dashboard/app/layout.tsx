@@ -2,24 +2,24 @@ import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
-import { FloatingFruits } from "@/components/FloatingFruits";
 import { VineScroll } from "@/components/VineScroll";
+import { currentReviewer } from "@/lib/reviewer";
 
 const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Freshroots Planning Desk",
-  description: "Stock recommendations, approvals and purchase orders for Freshroots.",
+  title: "Freshroots Demand Planning",
+  description: "Stock, recommendations, approvals and purchase orders for Freshroots.",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#e9f7ee" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const reviewer = await currentReviewer();
   return (
     <html lang="en" className={nunito.variable}>
       <body>
-        <FloatingFruits />
-        <Nav />
+        <Nav reviewer={reviewer} />
         <main className="wrap">{children}</main>
         <VineScroll />
       </body>
