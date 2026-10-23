@@ -41,7 +41,7 @@ export function ChangeRateChart({ data, kill }: { data: WeekPoint[]; kill: numbe
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis dataKey="week" tick={axis} stroke="var(--border)" />
           <YAxis domain={[0, 100]} unit="%" tick={axis} stroke="var(--border)" />
-          <Tooltip {...tip} formatter={(v) => [`${v}%`, "Override + reject"]} />
+          <Tooltip {...tip} formatter={(v) => [`${v}%`, "Changed or rejected"]} />
           <ReferenceLine y={kill * 100} stroke="var(--bad)" strokeDasharray="5 4" label={{ value: `${kill * 100}% kill line`, fill: "var(--bad)", fontSize: 12, position: "insideTopRight" }} />
           <Line isAnimationActive={false} type="monotone" dataKey="pct" stroke="var(--reorder)" strokeWidth={2.5} dot={{ r: 4 }} />
         </LineChart>

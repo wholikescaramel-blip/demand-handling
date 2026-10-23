@@ -27,7 +27,7 @@ var DEFAULT_RULES = [
   ['REVIEW_SLA_HOURS', 24, 'Hours Raghav has to decide before the backup approver is nudged'],
   ['OVERRIDE_ALERT_COUNT', 3, 'Open a Rule_Review item when a rule is overridden/rejected this many times...'],
   ['OVERRIDE_ALERT_DAYS', 28, '...within this many days'],
-  ['ADOPTION_KILL_PCT', 0.40, 'Kill criterion: overall override+reject rate above this for 4 weeks means the rules do not reflect Raghav']
+  ['ADOPTION_KILL_PCT', 0.60, 'Kill criterion: overall override+reject rate above this for 4 weeks means the rules do not reflect Raghav']
 ];
 
 function defaultRulesObject_() {

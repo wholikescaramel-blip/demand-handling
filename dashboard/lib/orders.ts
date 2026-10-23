@@ -8,18 +8,22 @@ export type GenerateResult = {
 };
 
 /**
- * Turns every approved line that is still READY into a numbered purchase order, one per vendor.
- * Lines are claimed first (marked CREATED) so two simultaneous calls can never put a line on two POs;
- * if anything goes wrong for a vendor, its lines go back to READY and the next call retries them.
+ * Turns approved lines that are still READY into numbered purchase orders. With `only`, just that one line (this is what
+ * happens the moment Raghav presses Approve: one approval, one PO). Without it, every READY line (a retry of any that
+ * failed). Lines are claimed first (marked CREATED) so two simultaneous calls can never put a line on two POs; if
+ * anything goes wrong, the lines go back to READY and the next call retries them.
  */
-export async function generatePosForReady(): Promise<GenerateResult> {
+export async function generatePosForReady(only?: { run_id: string; sku: string }): Promise<GenerateResult> {
   const sql = neon(process.env.DATABASE_URL!);
   const result: GenerateResult = { created: [], failed: [] };
+  const rid = only?.run_id ?? null;
+  const sk = only?.sku ?? null;
 
   const claimed = await sql`
     update decisions d set po_status = 'CREATED', po_created_at = now()
     from recommendations r
     where r.run_id = d.run_id and r.sku = d.sku and d.po_status = 'READY' and d.final_qty > 0
+      and (${rid}::text is null or d.run_id = ${rid}) and (${sk}::text is null or d.sku = ${sk})
     returning d.run_id, d.sku, d.final_qty, d.reviewer, r.name, r.distributor_id, r.distributor_name, r.unit, r.hsn, r.unit_cost, r.tax_pct`;
 
   // Vendor details (address, GSTIN, contact, email) as they are right now; frozen into each PO.
@@ -71,14 +75,4 @@ export async function generatePosForReady(): Promise<GenerateResult> {
     }
   }
   return result;
-}
-
-/** Called after each decision: once nothing is left undecided in the run, its approved lines become POs automatically. */
-export async function generateIfRunComplete(run_id: string): Promise<GenerateResult | null> {
-  const sql = neon(process.env.DATABASE_URL!);
-  const [{ pending }] = await sql`
-    select count(*) as pending from recommendations r
-    where r.run_id = ${run_id} and not exists (select 1 from decisions d where d.run_id = r.run_id and d.sku = r.sku)`;
-  if (Number(pending) > 0) return null;
-  return generatePosForReady();
 }

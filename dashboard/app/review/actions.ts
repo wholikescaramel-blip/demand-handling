@@ -5,10 +5,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { checkDecision } from "@/lib/po";
-import { generateIfRunComplete, generatePosForReady } from "@/lib/orders";
-import { getPo } from "@/lib/data";
+import { generatePosForReady } from "@/lib/orders";
+import { getPo, getSnapshot } from "@/lib/data";
 import { buildPoPdf, poOptionsFromEnv } from "@/lib/pdf";
 import { mailConfigured, sendMailViaWebApp, validEmail } from "@/lib/mail";
+import { clearDemoDecisions, readDemoDecisions, writeDemoDecisions } from "@/lib/demo-store";
 
 const back = (params: Record<string, string>) => `/review?${new URLSearchParams(params).toString()}`;
 
@@ -17,13 +18,34 @@ async function reviewerName(): Promise<string> {
   return (jar.get("dp_user")?.value || "reviewer").slice(0, 60);
 }
 
-/** Approve / Override / Reject one recommendation. First decision wins; it cannot be changed afterwards. */
+/**
+ * Raghav presses Approve or Reject on one recommendation. First decision wins; it cannot be changed afterwards.
+ * Approve orders the quantity in the box (pre-filled with the recommendation) and creates the PO straight away.
+ * Reject needs a reason and creates nothing.
+ */
 export async function decide(formData: FormData) {
-  if (!process.env.DATABASE_URL) redirect(back({ error: "Demo mode: connect a database to record decisions." }));
-  const sql = neon(process.env.DATABASE_URL!);
   const run_id = String(formData.get("run_id") ?? "");
   const sku = String(formData.get("sku") ?? "");
+  const button = String(formData.get("decision") ?? "");
+  const qty = String(formData.get("qty") ?? "");
+  const reasonIn = String(formData.get("reason") ?? "");
 
+  // ---- practice mode: no database, decisions live in this browser only
+  if (!process.env.DATABASE_URL) {
+    const snap = await getSnapshot();
+    const rec = snap.recs.find((r) => r.run_id === run_id && r.sku === sku);
+    if (!rec) redirect(back({ error: "That recommendation no longer exists.", sku }));
+    if (rec!.decision) redirect(back({ error: "This one already has a decision.", sku }));
+    const check = checkDecision({ action: rec!.action, recQty: rec!.rec_qty, button, qty, reason: reasonIn });
+    if (!check.ok) redirect(back({ error: check.error, sku }));
+    const list = await readDemoDecisions();
+    list.push({ run_id, sku, decision: check.decision, final_qty: check.finalQty, reason: check.reason, at: new Date().toISOString() });
+    await writeDemoDecisions(list);
+    revalidatePath("/review");
+    redirect(back({ ok: check.decision === "Reject" ? `${sku} rejected.` : check.finalQty ? `${sku} approved: PO created below.` : `${sku} approved: no order needed.` }));
+  }
+
+  const sql = neon(process.env.DATABASE_URL!);
   const [rec] = await sql`
     select r.action, r.rec_qty, r.flags, r.priority, u.run_at, u.mode
     from recommendations r join runs u on u.run_id = r.run_id
@@ -34,9 +56,7 @@ export async function decide(formData: FormData) {
   const check = checkDecision({
     action: rec.action,
     recQty: rec.rec_qty === null ? null : Number(rec.rec_qty),
-    decision: String(formData.get("decision") ?? ""),
-    overrideQty: String(formData.get("override_qty") ?? ""),
-    reason: String(formData.get("reason") ?? ""),
+    button, qty, reason: reasonIn,
   });
   if (!check.ok) redirect(back({ error: check.error, sku }));
 
@@ -52,22 +72,24 @@ export async function decide(formData: FormData) {
     returning sku`;
   if (!rows.length) redirect(back({ error: "Someone already decided this one.", sku }));
 
-  // Last decision of the run? Then its approved lines become purchase orders straight away.
-  const gen = await generateIfRunComplete(run_id);
+  // Approve with a quantity above zero: the PO is created right now, for this one line.
+  let message = check.decision === "Reject" ? `${sku} rejected.` : `${sku} approved: no order needed.`;
+  if (check.poStatus === "READY") {
+    const gen = await generatePosForReady({ run_id, sku });
+    message = gen.created.length
+      ? `${sku} approved: ${gen.created[0].po_number} created below.`
+      : `${sku} approved, but the PO could not be created yet. Use "Create PO" on its card to retry.`;
+  }
 
   revalidatePath("/review");
   revalidatePath("/orders");
   revalidatePath("/");
-  const verb = { Approve: "approved", Override: "overridden", Reject: "rejected" }[check.decision];
-  const made = gen?.created.length
-    ? ` All lines decided: ${gen.created.length} purchase order(s) generated (${gen.created.map((c) => c.po_number).join(", ")}).`
-    : "";
-  redirect(back({ ok: `${sku} ${verb}.${made}` }));
+  redirect(back({ ok: message }));
 }
 
-/** For a partial review (for example end of day): generate POs for what is approved so far. */
+/** Retry the PO for every approved line that is still waiting (only needed if creating one failed). */
 export async function generatePos() {
-  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Demo mode: connect a database first."));
+  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Practice mode creates POs when you approve; nothing is waiting."));
   const r = await generatePosForReady();
   revalidatePath("/orders");
   revalidatePath("/review");
@@ -75,9 +97,30 @@ export async function generatePos() {
   redirect(`/orders?created=${r.created.length}`);
 }
 
+/** Retry the PO for one approved line. */
+export async function createPoForLine(formData: FormData) {
+  if (!process.env.DATABASE_URL) redirect(back({ error: "Practice mode creates POs when you approve." }));
+  const run_id = String(formData.get("run_id") ?? "");
+  const sku = String(formData.get("sku") ?? "");
+  const r = await generatePosForReady({ run_id, sku });
+  revalidatePath("/review");
+  revalidatePath("/orders");
+  if (r.failed.length) redirect(back({ error: r.failed[0].error, sku }));
+  redirect(back({ ok: r.created.length ? `${sku}: ${r.created[0].po_number} created.` : `${sku}: nothing to create.` }));
+}
+
+/** Practice mode only: forget the practice decisions in this browser. */
+export async function resetPractice() {
+  await clearDemoDecisions();
+  revalidatePath("/review");
+  revalidatePath("/orders");
+  revalidatePath("/");
+  redirect(back({ ok: "Practice decisions cleared." }));
+}
+
 /** Goods arrived: the PO stops counting as stock on order. */
 export async function markReceived(formData: FormData) {
-  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Demo mode: connect a database first."));
+  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Practice mode: connect a database to track receipts."));
   const sql = neon(process.env.DATABASE_URL!);
   await sql`update purchase_orders set received_at = now() where po_number = ${String(formData.get("po_number") ?? "")} and received_at is null`;
   revalidatePath("/orders");
@@ -86,14 +129,16 @@ export async function markReceived(formData: FormData) {
 
 /** Email a PO's PDF to the vendor (or anyone) through the Apps Script mail web app. */
 export async function sendPoEmail(formData: FormData) {
-  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Demo mode: connect a database first."));
+  const from = String(formData.get("from") ?? "orders");
+  const dest = (p: Record<string, string>) => `/${from === "review" ? "review" : "orders"}?${new URLSearchParams(p).toString()}`;
+  if (!process.env.DATABASE_URL) redirect(dest({ error: "Practice mode: you can download the PO, but email needs a connected database." }));
   const po_number = String(formData.get("po_number") ?? "");
   const to = String(formData.get("to") ?? "").trim();
-  if (!validEmail(to)) redirect("/orders?error=" + encodeURIComponent(`Enter a valid email address for ${po_number}.`));
-  if (!mailConfigured()) redirect("/orders?error=" + encodeURIComponent("Email is not set up yet. You can still download the PDF."));
+  if (!validEmail(to)) redirect(dest({ error: `Enter a valid email address for ${po_number}.` }));
+  if (!mailConfigured()) redirect(dest({ error: "Email is not set up yet. You can still download the PDF." }));
 
   const po = await getPo(po_number);
-  if (!po) redirect("/orders?error=" + encodeURIComponent("That purchase order no longer exists."));
+  if (!po) redirect(dest({ error: "That purchase order no longer exists." }));
   const opts = poOptionsFromEnv();
   const pdf = await buildPoPdf(po!, opts);
   const company = opts.company?.name ?? "Freshroots";
@@ -107,11 +152,12 @@ export async function sendPoEmail(formData: FormData) {
     filename: `${po!.po_number}.pdf`,
     pdf,
   });
-  if (!r.ok) redirect("/orders?error=" + encodeURIComponent(r.error));
+  if (!r.ok) redirect(dest({ error: r.error }));
 
   const sql = neon(process.env.DATABASE_URL!);
   await sql`update purchase_orders set sent_at = now(), sent_to = ${to} where po_number = ${po_number}`;
   await sql`insert into settings (key, value) values (${"email:" + po!.vendor_key}, ${to}) on conflict (key) do update set value = excluded.value`;
   revalidatePath("/orders");
-  redirect(`/orders?sent=${encodeURIComponent(po_number)}`);
+  revalidatePath("/review");
+  redirect(dest({ ok: `${po_number} emailed to ${to}.` }));
 }

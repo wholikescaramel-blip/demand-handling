@@ -20,7 +20,8 @@ export function Nav() {
     <header className="nav">
       <nav className="nav-inner" aria-label="Main">
         <span className="brand">
-          Demand Planning Desk<small>Freshroots</small>
+          <span className="logo" aria-hidden="true">🌱</span>
+          Freshroots<small>Planning Desk</small>
         </span>
         {LINKS.map((l) => (
           <Link key={l.href} href={l.href} aria-current={path === l.href ? "page" : undefined}>

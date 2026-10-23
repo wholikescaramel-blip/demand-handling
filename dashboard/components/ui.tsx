@@ -30,7 +30,8 @@ export function ActionPill({ action }: { action: string }) {
 export function DecisionPill({ decision }: { decision: string | null }) {
   if (!decision) return <span className="pill na">Awaiting</span>;
   const cls = decision === "Approve" ? "ok" : decision === "Override" ? "warn" : decision === "Reject" ? "breach" : "na";
-  return <span className={`pill ${cls}`}>{decision === "EXPIRED" ? "Expired" : decision}</span>;
+  const label = decision === "Approve" ? "Approved" : decision === "Override" ? "Approved, qty changed" : decision === "Reject" ? "Rejected" : decision === "EXPIRED" ? "Expired" : decision;
+  return <span className={`pill ${cls}`}>{label}</span>;
 }
 
 const PO_CLASS: Record<string, string> = { READY: "warn", CREATED: "ok", NONE: "na" };
@@ -62,8 +63,8 @@ export function DemoBanner({ demo }: { demo: boolean }) {
   if (!demo) return null;
   return (
     <div className="banner" role="note">
-      <strong>Demo data.</strong> No database is connected, so this shows the real rules engine run on the five sample CSVs at weekly
-      cut-offs, with <em>illustrative</em> review decisions. Set <code>DATABASE_URL</code> to show live data.
+      <strong>Practice mode.</strong> No database is connected, so this shows the real rules engine run on your five sample CSVs. Nothing has been
+      decided: you decide. Your clicks are kept in this browser only, so you can try Approve, Reject and the POs. Connect Neon (<code>DATABASE_URL</code>) to make it real.
     </div>
   );
 }

@@ -4,43 +4,59 @@ import { aggregateOpenQty, checkDecision, formatPoNumber, groupByVendor, type Po
 import { PDFDocument } from "pdf-lib";
 import { buildPoPdf, pdfText } from "../lib/pdf.ts";
 
-const base = { action: "REORDER", recQty: 750, decision: "Approve", overrideQty: "", reason: "" };
+const base = { action: "REORDER", recQty: 750, button: "Approve", qty: "750", reason: "" };
 
-test("Approve a REORDER: final qty is the recommendation and a PO is READY", () => {
-  const r = checkDecision(base);
-  assert.deepEqual(r, { ok: true, decision: "Approve", finalQty: 750, poStatus: "READY", reason: null });
+test("Approve at the recommended quantity: an Approve, and a PO is READY", () => {
+  assert.deepEqual(checkDecision(base), { ok: true, decision: "Approve", finalQty: 750, poStatus: "READY", reason: null });
 });
 
-test("Approve a PAUSE: nothing to order", () => {
-  const r = checkDecision({ ...base, action: "PAUSE", recQty: 0 });
-  assert.ok(r.ok && r.finalQty === 0 && r.poStatus === "NONE");
+test("An empty quantity box means the recommended quantity", () => {
+  const r = checkDecision({ ...base, qty: "" });
+  assert.ok(r.ok && r.finalQty === 750 && r.decision === "Approve");
+});
+
+test("Approve with a different quantity is recorded as an Override and needs a reason", () => {
+  assert.equal(checkDecision({ ...base, qty: "900" }).ok, false);
+  const r = checkDecision({ ...base, qty: "900", reason: "Scheme running" });
+  assert.ok(r.ok && r.decision === "Override" && r.finalQty === 900 && r.poStatus === "READY");
+});
+
+test("The quantity must be a whole number", () => {
+  for (const bad of ["-5", "12.5", "abc", "1e3"]) assert.equal(checkDecision({ ...base, qty: bad, reason: "x" }).ok, false, bad);
 });
 
 test("Reject needs a reason and never creates a PO", () => {
-  assert.equal(checkDecision({ ...base, decision: "Reject" }).ok, false);
-  const r = checkDecision({ ...base, decision: "Reject", reason: "Already ordered by phone" });
-  assert.ok(r.ok && r.finalQty === null && r.poStatus === "NONE");
+  assert.equal(checkDecision({ ...base, button: "Reject" }).ok, false);
+  assert.equal(checkDecision({ ...base, button: "Reject", reason: "   " }).ok, false);
+  const r = checkDecision({ ...base, button: "Reject", reason: "Already ordered by phone" });
+  assert.ok(r.ok && r.decision === "Reject" && r.finalQty === null && r.poStatus === "NONE");
 });
 
-test("Override needs a whole-number qty and a reason", () => {
-  assert.equal(checkDecision({ ...base, decision: "Override", reason: "x" }).ok, false);
-  assert.equal(checkDecision({ ...base, decision: "Override", overrideQty: "-5", reason: "x" }).ok, false);
-  assert.equal(checkDecision({ ...base, decision: "Override", overrideQty: "12.5", reason: "x" }).ok, false);
-  assert.equal(checkDecision({ ...base, decision: "Override", overrideQty: "900" }).ok, false);
-  const r = checkDecision({ ...base, decision: "Override", overrideQty: "900", reason: "Scheme running" });
-  assert.ok(r.ok && r.finalQty === 900 && r.poStatus === "READY");
+test("A PAUSE recommendation: Approve at 0 agrees to skip the order, a quantity orders anyway", () => {
+  const pause = { action: "PAUSE", recQty: 0, button: "Approve", qty: "0", reason: "" };
+  const agree = checkDecision(pause);
+  assert.ok(agree.ok && agree.decision === "Approve" && agree.finalQty === 0 && agree.poStatus === "NONE");
+  assert.ok(checkDecision({ ...pause, qty: "" }).ok);
+  assert.equal(checkDecision({ ...pause, qty: "200" }).ok, false);
+  const anyway = checkDecision({ ...pause, qty: "200", reason: "Festival stock needed" });
+  assert.ok(anyway.ok && anyway.decision === "Override" && anyway.poStatus === "READY");
 });
 
-test("Override to 0 records the change but orders nothing", () => {
-  const r = checkDecision({ ...base, decision: "Override", overrideQty: "0", reason: "Enough stock on the shelf" });
-  assert.ok(r.ok && r.finalQty === 0 && r.poStatus === "NONE");
+test("Changing the quantity to 0 records the change but orders nothing", () => {
+  const r = checkDecision({ ...base, qty: "0", reason: "Enough stock on the shelf" });
+  assert.ok(r.ok && r.decision === "Override" && r.finalQty === 0 && r.poStatus === "NONE");
 });
 
-test("A manual-review row cannot be approved as is, but can be overridden with a quantity", () => {
-  const m = { ...base, action: "MANUAL_REVIEW", recQty: null };
+test("A manual-review row has no recommendation, so Raghav must type a quantity and a reason", () => {
+  const m = { action: "MANUAL_REVIEW", recQty: null, button: "Approve", qty: "", reason: "" };
   assert.equal(checkDecision(m).ok, false);
-  const r = checkDecision({ ...m, decision: "Override", overrideQty: "200", reason: "New launch, planning 200" });
-  assert.ok(r.ok && r.poStatus === "READY");
+  assert.equal(checkDecision({ ...m, qty: "200" }).ok, false);
+  const r = checkDecision({ ...m, qty: "200", reason: "New launch, planning 200" });
+  assert.ok(r.ok && r.decision === "Override" && r.poStatus === "READY");
+});
+
+test("An unknown button is refused", () => {
+  assert.equal(checkDecision({ ...base, button: "Maybe" }).ok, false);
 });
 
 const line = (sku: string, vendor: string, qty = 100): PoLine => ({ run_id: "R1", sku, name: sku, qty, vendor_key: vendor, vendor_name: vendor });

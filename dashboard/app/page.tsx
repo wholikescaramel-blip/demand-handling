@@ -39,7 +39,7 @@ export default async function Overview() {
       <section className="grid kpis" aria-label="Key numbers">
         <Kpi label="SKUs flagged" value={run ? `${run.flagged} of ${run.skus}` : "n/a"} note={run ? `${run.n_reorder} reorder · ${run.n_pause} pause · ${run.n_manual} manual` : undefined} />
         <Kpi label="Awaiting Raghav" value={awaiting === null ? "n/a" : <a href="/review" style={{ color: "inherit" }}>{awaiting}</a>} note={awaiting === null ? "Shadow mode: nothing sent to review" : "decisions due within 24h"} />
-        <Kpi label="Override + reject rate" value={pct(stats.changedRate)} note={`Kill line ${pct(ADOPTION_KILL)} · ${stats.decided} decided`} />
+        <Kpi label="Changed or rejected" value={pct(stats.changedRate)} note={`Kill line ${pct(ADOPTION_KILL)} · ${stats.decided} decided`} />
         <Kpi label="Avg time to decide" value={stats.avgHours === null ? "n/a" : `${stats.avgHours.toFixed(1)} h`} note={stats.slaRate === null ? undefined : `${pct(stats.slaRate)} within 24h`} />
         <Kpi label="Gemini usage" value={`${(tokens / 1000).toFixed(1)}k tokens`} note={cost === null ? "Free tier: Rs 0" : `about Rs ${cost.toFixed(2)}`} />
       </section>
@@ -61,7 +61,7 @@ export default async function Overview() {
           <RunsChart data={runSeries(snap.runs)} />
         </div>
         <div className="card">
-          <h2>Override + reject rate by week</h2>
+          <h2>Quantity changed or rejected, by week</h2>
           <ChangeRateChart data={weekly} kill={ADOPTION_KILL} />
         </div>
       </section>

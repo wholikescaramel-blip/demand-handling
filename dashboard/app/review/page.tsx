@@ -1,9 +1,26 @@
 import { getSnapshot } from "@/lib/data";
-import { groupByVendor } from "@/lib/po";
+import { mailConfigured } from "@/lib/mail";
 import { ActionPill, DecisionPill, DemoBanner, PoPill, fmtDateTime } from "@/components/ui";
-import { decide, generatePos } from "./actions";
+import { DecisionForm } from "@/components/DecisionForm";
+import { PoActions } from "@/components/PoActions";
+import { createPoForLine, decide, resetPractice } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+const FLAG_LABEL: Record<string, string> = {
+  STOCKOUT_RISK: "Stockout risk",
+  OVERSTOCK_RISK: "Overstock risk",
+  HIGH_DEMAND: "High demand",
+  SHORT_HISTORY: "New SKU, short history",
+  NO_INVENTORY: "No stock record",
+  NO_SALES: "No recent sales",
+};
+
+function recommendationText(action: string, qty: number | null): string {
+  if (action === "REORDER") return `Order ${qty}`;
+  if (action === "PAUSE") return "Pause the next order";
+  return "Needs your call";
+}
 
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string; sku?: string }> }) {
   const { error, ok, sku: errSku } = await searchParams;
@@ -12,11 +29,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const live = run?.mode === "LIVE";
   const pending = live ? snap.recs.filter((r) => !r.decision) : [];
   const decided = live ? snap.recs.filter((r) => r.decision) : [];
-  const ready = decided.filter((r) => r.po_status === "READY");
-  const vendorCount = groupByVendor(
-    ready.map((r) => ({ run_id: r.run_id, sku: r.sku, name: r.name, qty: r.final_qty ?? 0, vendor_key: r.distributor_id ?? "UNKNOWN", vendor_name: r.distributor_name ?? null })),
-  ).length;
-  const locked = snap.demo;
+  const emailOn = mailConfigured();
+  const poBy = new Map(snap.pos.map((p) => [p.po_number, p]));
 
   return (
     <>
@@ -24,16 +38,14 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       <h1>Review</h1>
       <p className="sub">
         {run ? (
-          <>
-            Run {run.run_id} · stock as of {run.as_of} · {live ? (run.review_due_at ? "decide by " + fmtDateTime(run.review_due_at) : "awaiting decisions") : "shadow mode: nothing to decide"}
-          </>
+          <>Run {run.run_id} · stock as of {run.as_of} · {live ? (run.review_due_at ? `decide by ${fmtDateTime(run.review_due_at)}` : "waiting for your decisions") : "shadow mode: nothing to decide"}</>
         ) : (
           "No run yet."
         )}
       </p>
 
-      {error ? <div className="banner" role="alert" style={{ background: "var(--bad-bg)", borderColor: "var(--bad)" }}>{error}</div> : null}
-      {ok ? <div className="banner" role="status" style={{ background: "var(--ok-bg)", borderColor: "var(--healthy)" }}>{ok}</div> : null}
+      {error ? <div className="banner bad" role="alert">{error}</div> : null}
+      {ok ? <div className="banner good" role="status">{ok}</div> : null}
 
       {run && !live ? (
         <section className="card">
@@ -45,89 +57,87 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : null}
 
       {live ? (
-        <section className="card" style={{ marginBottom: 14 }}>
-          <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
-            <div>
-              <h2 style={{ marginBottom: 2 }}>Approved, waiting for a purchase order</h2>
-              <span className="small dim">
-                {ready.length} line(s) across {vendorCount} vendor(s). PO PDFs are generated automatically once every line in this run has a
-                decision, or when the next run arrives. One PO per vendor.
-              </span>
-            </div>
-            <form action={generatePos}>
-              <button className="btn primary" type="submit" disabled={locked || !ready.length}>
-                Generate POs now{ready.length ? ` (${vendorCount})` : ""}
-              </button>
-            </form>
-          </div>
-        </section>
-      ) : null}
-
-      {live ? (
-        <section className="card" style={{ marginBottom: 14 }}>
-          <h2>Waiting for your decision ({pending.length})</h2>
-          {!pending.length ? <p className="dim" style={{ margin: 0 }}>Nothing waiting. Everything in this run has a decision.</p> : null}
+        <section style={{ marginBottom: 18 }}>
+          <h2 className="sectiontitle">Waiting for your decision ({pending.length})</h2>
+          <p className="small dim" style={{ marginTop: -4 }}>
+            The rules only recommend. Nothing is ordered until you press Approve. The quantity box starts at the recommendation; change it if
+            you know better. Rejecting needs a reason.
+          </p>
+          {!pending.length ? <div className="card"><p className="dim" style={{ margin: 0 }}>Nothing waiting. Everything in this run has a decision.</p></div> : null}
           <div className="reviewlist">
             {pending.map((r) => (
-              <form key={r.sku} action={decide} className={`reviewitem${errSku === r.sku ? " haserr" : ""}`}>
-                <input type="hidden" name="run_id" value={r.run_id} />
-                <input type="hidden" name="sku" value={r.sku} />
+              <article key={r.sku} className={`reviewitem${errSku === r.sku ? " haserr" : ""}`}>
                 <div className="reviewhead">
                   <div>
-                    <strong>{r.sku}</strong> <span className="dim">{r.name}</span>{r.perishable ? <span className="pill neutral" style={{ marginLeft: 8 }}>perishable</span> : null}
+                    <strong>{r.sku}</strong> <span className="dim">{r.name}</span>
+                    {r.perishable ? <span className="pill neutral" style={{ marginLeft: 8 }}>perishable</span> : null}
                     <div className="small dim">Vendor: {r.distributor_name ?? r.distributor_id ?? "unknown"} · priority {r.priority}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <ActionPill action={r.action} />
-                    <div style={{ fontSize: 20, fontWeight: 700 }}>{r.action === "MANUAL_REVIEW" ? "Your call" : r.action === "PAUSE" ? "Pause order" : `Order ${r.rec_qty}`}</div>
+                    <div className="bigqty">{recommendationText(r.action, r.rec_qty)}</div>
+                    <div className="small dim">recommended by the rules</div>
                   </div>
                 </div>
-                <p style={{ margin: "6px 0" }}>{r.reason}</p>
-                <div className="small dim">
-                  On hand {r.on_hand}{r.open_po ? ` (+${r.open_po} on order)` : ""} · cover {r.cover_weeks ?? "n/a"} wks · trend{" "}
-                  {r.trend_pct === null ? "n/a" : `${r.trend_pct > 0 ? "+" : ""}${r.trend_pct}%`} ·{" "}
-                  {r.reason_source === "gemini" ? "reason by Gemini" : "template reason"}{r.data_notes ? ` · ${r.data_notes}` : ""}
-                </div>
-                <div className="reviewcontrols">
-                  <label className="small dim">Qty if overriding
-                    <input name="override_qty" type="number" min={0} step={1} inputMode="numeric" placeholder={r.rec_qty?.toString() ?? ""} />
-                  </label>
-                  <label className="small dim" style={{ flex: 1, minWidth: 200 }}>Reason (needed to override or reject)
-                    <input name="reason" type="text" maxLength={300} placeholder="e.g. distributor scheme starting Monday" />
-                  </label>
-                  <div className="btns">
-                    <button className="btn ok" type="submit" name="decision" value="Approve" disabled={locked || r.action === "MANUAL_REVIEW"}>Approve</button>
-                    <button className="btn warn" type="submit" name="decision" value="Override" disabled={locked}>Override</button>
-                    <button className="btn bad" type="submit" name="decision" value="Reject" disabled={locked}>Reject</button>
-                  </div>
-                </div>
-              </form>
+
+                <dl className="metrics">
+                  <div><dt>On hand</dt><dd>{r.on_hand}{r.open_po ? <span className="dim"> +{r.open_po} on order</span> : null}</dd></div>
+                  <div><dt>Weeks of cover</dt><dd>{r.cover_weeks ?? "n/a"}</dd></div>
+                  <div><dt>Last 4 weeks vs 12-week avg</dt><dd>{r.trend_pct === null ? "n/a" : `${r.trend_pct > 0 ? "+" : ""}${r.trend_pct}%`}</dd></div>
+                  <div><dt>Triggered by</dt><dd>{(r.flags ?? "").split(" + ").filter(Boolean).map((f) => FLAG_LABEL[f] ?? f).join(", ") || "n/a"}</dd></div>
+                </dl>
+                <p style={{ margin: "8px 0 0" }}>{r.reason}</p>
+                <div className="small dim">{r.reason_source === "gemini" ? "Reason written by Gemini" : "Standard reason text"}{r.data_notes ? ` · ${r.data_notes}` : ""}</div>
+
+                <DecisionForm action={decide} runId={r.run_id} sku={r.sku} recQty={r.rec_qty} kind={r.action as "REORDER" | "PAUSE" | "MANUAL_REVIEW"} />
+              </article>
             ))}
           </div>
         </section>
       ) : null}
 
       {decided.length ? (
-        <section className="card">
-          <h2>Decided in this run ({decided.length})</h2>
-          <div className="tablewrap">
-            <table>
-              <thead><tr><th>SKU</th><th>Recommended</th><th>Decision</th><th className="num">Final qty</th><th>Why</th><th>Purchase order</th></tr></thead>
-              <tbody>
-                {decided.map((r) => (
-                  <tr key={r.sku}>
-                    <td><strong>{r.sku}</strong><div className="small dim">{r.name}</div></td>
-                    <td><ActionPill action={r.action} /><div className="small dim">qty {r.rec_qty ?? "—"}</div></td>
-                    <td><DecisionPill decision={r.decision} /></td>
-                    <td className="num">{r.final_qty ?? "—"}</td>
-                    <td className="reason">{r.change_reason ?? <span className="dim">—</span>}</td>
-                    <td><PoPill status={r.po_status} />{r.po_number ? <div className="small"><a href={`/api/po/${r.po_number}`} target="_blank" rel="noreferrer">{r.po_number} (PDF)</a></div> : null}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section>
+          <h2 className="sectiontitle">Decided ({decided.length})</h2>
+          <div className="reviewlist">
+            {decided.map((r) => {
+              const po = r.po_number ? poBy.get(r.po_number) : undefined;
+              return (
+                <article key={r.sku} className="reviewitem done">
+                  <div className="reviewhead">
+                    <div>
+                      <strong>{r.sku}</strong> <span className="dim">{r.name}</span>
+                      <div className="small dim">Vendor: {r.distributor_name ?? r.distributor_id ?? "unknown"} · recommended: {recommendationText(r.action, r.rec_qty)}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <DecisionPill decision={r.decision} />
+                      <div className="bigqty">{r.decision === "Reject" ? "Not ordered" : r.final_qty ? `Ordered ${r.final_qty}` : "No order"}</div>
+                    </div>
+                  </div>
+                  {r.change_reason ? <p className="small" style={{ margin: "6px 0 0" }}>Reason: {r.change_reason}</p> : null}
+                  {po ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 6 }}>Purchase order {po.po_number}</div>
+                      <PoActions po={po} emailOn={emailOn} canEmail={!snap.demo} from="review" defaultTo={snap.vendorEmails?.[po.vendor_key] ?? po.vendor?.email ?? ""} />
+                    </div>
+                  ) : r.po_status === "READY" ? (
+                    <form action={createPoForLine} style={{ marginTop: 10 }}>
+                      <input type="hidden" name="run_id" value={r.run_id} />
+                      <input type="hidden" name="sku" value={r.sku} />
+                      <PoPill status="READY" /> <button className="btn primary" type="submit">Create PO</button>
+                    </form>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </section>
+      ) : null}
+
+      {snap.demo ? (
+        <form action={resetPractice} style={{ marginTop: 18 }}>
+          <button className="btn" type="submit">Clear my practice decisions</button>
+        </form>
       ) : null}
     </>
   );

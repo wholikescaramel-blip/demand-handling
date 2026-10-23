@@ -2,7 +2,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   const { error } = await searchParams;
   return (
     <div className="login card">
-      <h1>Demand Planning Desk</h1>
+      <h1>🌱 Freshroots Planning Desk</h1>
       <p className="sub">Sign in with your name and the team password. Your name is recorded on every decision.</p>
       <form method="post" action="/api/login">
         <label htmlFor="name" className="small dim">Your name</label>

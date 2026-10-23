@@ -3,10 +3,10 @@
 export type PoStatus = "NONE" | "READY" | "CREATED";
 
 export type DecisionInput = {
-  action: string; // REORDER | PAUSE | MANUAL_REVIEW
-  recQty: number | null;
-  decision: string; // Approve | Override | Reject
-  overrideQty: string;
+  action: string; // REORDER | PAUSE | MANUAL_REVIEW: what the rules recommended
+  recQty: number | null; // the recommended quantity (null for a manual-review row)
+  button: string; // Approve | Reject: the button Raghav pressed
+  qty: string; // the quantity in the box (pre-filled with the recommendation)
   reason: string;
 };
 
@@ -15,30 +15,35 @@ export type DecisionCheck =
   | { ok: false; error: string };
 
 /**
- * The review gate. Reject and Override need a reason (that is the kill switch and the feedback signal).
- * A manual-review row has no quantity to approve, so it must be overridden with one or rejected.
+ * The review gate: Raghav presses Approve or Reject, nothing else.
+ * - Reject needs a reason and never creates a PO.
+ * - Approve orders the quantity in the box. If it is the recommended quantity the decision is "Approve"; if Raghav typed
+ *   a different one it is recorded as "Override" and needs a reason (that reason is the feedback the rules learn from).
+ * - A PAUSE recommendation is pre-filled with 0: Approve agrees to skip the order; typing a quantity orders anyway.
+ * - A manual-review row has no recommended quantity, so Raghav must type one (and say why).
  * Only a decision that ends with a quantity above zero is READY for a purchase order.
  */
 export function checkDecision(i: DecisionInput): DecisionCheck {
   const reason = i.reason.trim();
-  if (i.decision === "Reject") {
-    if (!reason) return { ok: false, error: "Reject needs a reason." };
+  if (i.button === "Reject") {
+    if (!reason) return { ok: false, error: "Please give a reason for rejecting." };
     return { ok: true, decision: "Reject", finalQty: null, poStatus: "NONE", reason };
   }
-  if (i.decision === "Override") {
-    const raw = i.overrideQty.trim();
-    if (raw === "" || !/^\d+$/.test(raw)) return { ok: false, error: "Override needs a whole-number quantity (0 or more)." };
-    if (!reason) return { ok: false, error: "Override needs a reason." };
-    const qty = Number(raw);
-    return { ok: true, decision: "Override", finalQty: qty, poStatus: qty > 0 ? "READY" : "NONE", reason };
+  if (i.button !== "Approve") return { ok: false, error: "Unknown decision." };
+
+  const base = i.action === "PAUSE" ? 0 : i.recQty;
+  const raw = i.qty.trim();
+  if (raw === "") {
+    if (base === null) return { ok: false, error: "Enter the quantity you want to order." };
+  } else if (!/^\d+$/.test(raw)) {
+    return { ok: false, error: "The quantity must be a whole number (0 or more)." };
   }
-  if (i.decision === "Approve") {
-    if (i.action === "MANUAL_REVIEW") return { ok: false, error: "A manual-review row has no quantity to approve. Override with a quantity, or reject." };
-    if (i.action === "PAUSE") return { ok: true, decision: "Approve", finalQty: 0, poStatus: "NONE", reason: reason || null };
-    const qty = i.recQty ?? 0;
-    return { ok: true, decision: "Approve", finalQty: qty, poStatus: qty > 0 ? "READY" : "NONE", reason: reason || null };
+  const qty = raw === "" ? (base as number) : Number(raw);
+  const changed = base === null || qty !== base;
+  if (changed && !reason) {
+    return { ok: false, error: base === null ? "Please say why you chose this quantity." : "You changed the quantity. Please say why." };
   }
-  return { ok: false, error: "Unknown decision." };
+  return { ok: true, decision: changed ? "Override" : "Approve", finalQty: qty, poStatus: qty > 0 ? "READY" : "NONE", reason: reason || null };
 }
 
 export type PoLine = {

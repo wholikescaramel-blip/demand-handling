@@ -58,7 +58,7 @@ test("killChecks: completeness gate and adoption need 4 straight weeks", () => {
   assert.equal(low[0].status, "breach");
   assert.equal(killChecks(run(100), stats, [])[0].status, "ok");
 
-  const weeks = ["2026-W40", "2026-W41", "2026-W42", "2026-W43"].map((week) => ({ week, rate: 0.5, n: 10 }));
+  const weeks = ["2026-W40", "2026-W41", "2026-W42", "2026-W43"].map((week) => ({ week, rate: 0.7, n: 10 }));
   assert.equal(killChecks(run(100), stats, weeks)[1].status, "breach");
   assert.equal(killChecks(run(100), stats, weeks.slice(2))[1].status, "warn");
   assert.equal(killChecks(run(100), stats, [])[1].status, "na");

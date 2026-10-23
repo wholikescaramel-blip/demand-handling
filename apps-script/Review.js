@@ -177,7 +177,7 @@ function checkSla() {
 
 /**
  * After each finalise: a rule (flag) overridden/rejected OVERRIDE_ALERT_COUNT+ times in OVERRIDE_ALERT_DAYS opens a
- * Rule_Review item. Also records the overall override rate against the 40% adoption kill criterion.
+ * Rule_Review item. Also records the overall override rate against the 60% adoption kill criterion.
  * Rules never change themselves: a human edits Rules_Config.
  */
 function evaluateRuleFeedback_(rules) {

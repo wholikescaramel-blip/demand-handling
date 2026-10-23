@@ -1,7 +1,7 @@
 import type { ImpactEval } from "./impact.ts";
 import type { Decision, Run } from "./types.ts";
 
-export const ADOPTION_KILL = 0.4;
+export const ADOPTION_KILL = 0.6;
 export const NOISE_KILL = 0.3;
 export const COMPLETENESS_GATE = 95;
 export const SLA_HOURS = 24;
@@ -50,7 +50,7 @@ export function isoWeek(iso: string): string {
 
 export type WeekPoint = { week: string; rate: number; n: number };
 
-/** Override + reject rate per ISO week, oldest first. EXPIRED rows are ignored. */
+/** Changed-or-rejected rate per ISO week, oldest first. EXPIRED rows are ignored. */
 export function weeklyChangeRate(decisions: Decision[]): WeekPoint[] {
   const by = new Map<string, { n: number; changed: number }>();
   for (const d of decisions) {
@@ -110,12 +110,12 @@ export function killChecks(latest: Run | null, stats: DecisionStats, weekly: Wee
 
   const last4 = weekly.slice(-4);
   if (!last4.length) {
-    checks.push({ name: "Adoption (override + reject rate)", status: "na", value: "no decisions yet", rule: `Stop if above ${pct(ADOPTION_KILL)} for 4 straight weeks` });
+    checks.push({ name: "Adoption (quantity changed or rejected)", status: "na", value: "no decisions yet", rule: `Stop if above ${pct(ADOPTION_KILL)} for 4 straight weeks` });
   } else {
     const allOver = last4.length === 4 && last4.every((w) => w.rate > ADOPTION_KILL);
     const latestOver = last4[last4.length - 1].rate > ADOPTION_KILL;
     checks.push({
-      name: "Adoption (override + reject rate)",
+      name: "Adoption (quantity changed or rejected)",
       status: allOver ? "breach" : latestOver ? "warn" : "ok",
       value: `${pct(stats.changedRate ?? 0)} overall, ${pct(last4[last4.length - 1].rate)} this week`,
       rule: `Stop if above ${pct(ADOPTION_KILL)} for 4 straight weeks`,

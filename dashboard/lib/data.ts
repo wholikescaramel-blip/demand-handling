@@ -1,5 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import demo from "./demo-data.json";
+import { applyDemo } from "./demo-apply.ts";
+import { readDemoDecisions } from "./demo-store.ts";
 import { parseSettings, type LossEntry } from "./impact.ts";
 import type { Decision, PurchaseOrder, Rec, Run, RuleReview, Snapshot } from "./types.ts";
 
@@ -10,7 +12,7 @@ const num = (v: unknown): number | null => (v === null || v === undefined ? null
 
 /** Everything the pages need, in one place. Falls back to bundled demo data when DATABASE_URL is not set. */
 export async function getSnapshot(): Promise<Snapshot> {
-  if (!hasDb()) return demo as unknown as Snapshot;
+  if (!hasDb()) return applyDemo(demo as unknown as Snapshot, await readDemoDecisions());
 
   const sql = neon(process.env.DATABASE_URL!);
   const [runRows, decisionRows, reviewRows, poRows, lossRows, settingRows, firstLive] = await Promise.all([
@@ -89,7 +91,7 @@ function mapPo(p: Record<string, any>): PurchaseOrder { // eslint-disable-line @
 }
 
 export async function getPo(po_number: string): Promise<PurchaseOrder | null> {
-  if (!hasDb()) return ((demo as unknown as Snapshot).pos ?? []).find((p) => p.po_number === po_number) ?? null;
+  if (!hasDb()) return (await getSnapshot()).pos.find((p) => p.po_number === po_number) ?? null;
   const sql = neon(process.env.DATABASE_URL!);
   const rows = await sql`select * from purchase_orders where po_number = ${po_number}`;
   return rows.length ? mapPo(rows[0]) : null;

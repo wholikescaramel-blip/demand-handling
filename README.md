@@ -1,6 +1,6 @@
 # Freshroots Demand Planning
 
-Twice-weekly stock recommendations for Raghav. **Drive + Sheets + Apps Script** run the rules; **Gemini** words the reasons; Raghav **approves, rejects or overrides in a web dashboard** (Vercel + Neon). Approved lines automatically become **numbered purchase orders in a standard PO format**, which can be downloaded or emailed from the dashboard. A graph tracks whether losses are actually falling, with a day-90 verdict. Nothing is generated without Raghav's approval.
+Twice-weekly stock recommendations for Raghav. **Drive + Sheets + Apps Script** run the rules; **Gemini** words the reasons; Raghav **presses Approve or Reject in a web dashboard** (Vercel + Neon): the rules only recommend, and every approval creates a PO. Each approval creates one **numbered purchase order in a standard PO format**, which can be downloaded or emailed from the dashboard. A graph tracks whether losses are actually falling, with a day-90 verdict. Nothing is generated without Raghav's approval.
 
 Components map: `docs/demand_planning_components_map_v5.png`. Sample PO: `docs/sample_purchase_order.pdf` (illustrative details).
 
@@ -13,9 +13,9 @@ SAP export (CSV, Tue/Fri) -> Drive folder
   -> Engine.js    Raghav's 5 rules, one recommendation per SKU, priority score, manual lane
   -> Gemini.js    one-line reason per flag + run summary (numbers checked, template fallback)
   -> Sync.js      pushes the run (and vendor details) to the dashboard (Neon)
-  -> Dashboard    Raghav: Approve / Reject / Override qty. Reject and Override need a reason
-  -> PO           once every line of a run is decided (or "Generate POs now"), approved lines become
-                  one PO per vendor, numbered DP-YYYY-NNNN
+  -> Dashboard    one card per SKU with the rule metrics. Raghav presses Approve (quantity box pre-filled, editable)
+                  or Reject (a reason is required). Changing the quantity also needs a reason
+  -> PO           Approve with a quantity above 0 creates that line's PO straight away, numbered DP-YYYY-NNNN
   -> Download / email   buttons on the Purchase orders page; email goes from your Gmail via an Apps Script web app
   -> Sheet        decisions and PO numbers are mirrored back (Decision_Log, Approved, Rejections)
   -> Rule_Review  a rule overridden 3+ times in 28 days opens a review; rules never edit themselves
@@ -29,7 +29,7 @@ SAP export (CSV, Tue/Fri) -> Drive folder
 | | `Sync.js` | Push runs to the dashboard; pull decisions and on-order stock back |
 | | `Mail.js` | Optional web app: lets the dashboard email a PO from your Gmail |
 | | `Review.js`, `Main.js`, `Setup.js` | Sheet-only review (fallback), override feedback loop, pipeline, menu, triggers |
-| Dashboard | `app/review`, `app/orders` | Approve / reject / override; POs with Preview, Download, Send by email, Mark received |
+| Dashboard | `app/review`, `app/orders` | Approve / Reject cards; POs with Preview, Download, Send by email, Mark received |
 | | `app/impact` | Weekly loss entries, graphs, day counter, day-90 verdict |
 | | `app/` overview, log, rules, cost | KPIs, guardrails vs kill criteria, review log, rule change rates, Gemini cost |
 | | `lib/po.ts`, `lib/orders.ts`, `lib/pdf.ts`, `lib/impact.ts`, `lib/mail.ts` | Decision rules and numbering, PO generation, the PDF, impact maths, email |
@@ -49,7 +49,7 @@ It uses what the data has and shows "-" where it does not. To fill the rest, add
 
 Company details come from Vercel environment variables (all optional): `COMPANY_NAME`, `COMPANY_ADDRESS`, `COMPANY_GSTIN`, `COMPANY_CONTACT`, `COMPANY_EMAIL`, `SHIP_TO` (lines separated by `|`), `PO_EXPIRY_DAYS` (7), `PAYMENT_TERMS`, `PO_TERMS` (clauses separated by `|`). Without prices the Amount column and grand total say so, and the terms ask the vendor to confirm rates.
 
-1. When the last line of a run is decided, all approved lines with a quantity above zero become POs, one per vendor (the Distributor_ID in `sku_master.csv`). "Generate POs now" does the same for a partial review; anything still approved when the next run arrives is turned into POs then.
+1. Raghav presses **Approve** on a card. The quantity box starts at the recommendation; if he types a different quantity it is recorded as a change and needs a reason. A quantity above zero creates that line's PO immediately: one approval, one PO, with the vendor from the Distributor_ID in `sku_master.csv`. If creating the PO ever fails, the card shows a **Create PO** button and the Purchase orders page has **Create the missing POs**.
 2. Each PO gets a number from a database sequence and a frozen copy of its lines and vendor details, so the PDF never changes after the fact.
 3. On the **Purchase orders** page: **Preview**, **Download PDF**, **Send by email**, **Mark received**.
 4. Until marked received, a PO's quantities count as stock on order, so a SKU that already has an order out is not flagged again (POs older than `OPEN_PO_DAYS`, default 21, stop counting).
@@ -87,11 +87,11 @@ The dashboard's **Impact** page answers "are losses actually falling?" without n
 3. Deploy. The build creates the tables itself (`npm run db:migrate` runs when `DATABASE_URL` is present).
 4. Set `DASHBOARD_URL` and `SYNC_SECRET` in the Apps Script Configure dialog. Then set `SHADOW_MODE` to `FALSE`, run the pipeline, open `/review` and sign in with your name and the team password.
 
-Without `DATABASE_URL` the dashboard shows clearly labelled demo data: `cd dashboard && npm run dev`. With a database but no `DASHBOARD_PASSWORD` it refuses to load.
+Without `DATABASE_URL` the dashboard runs in **practice mode**: it shows the real rules engine on your sample CSVs with nothing decided, and every Approve and Reject you click is kept in your own browser only (a **Clear my practice decisions** button resets it). The Impact graphs use clearly labelled illustrative numbers. Run it locally with `cd dashboard && npm run dev`. With a database but no `DASHBOARD_PASSWORD` it refuses to load.
 
 ## How the rules get re-evaluated
 
-The rules are Raghav's fixed thresholds (20% trend, 6 and 14 weeks, +25% festival, 3 to 4 weeks for perishables). They never change by themselves. Every override or rejection is logged with its reason and the rule flags that triggered it. When the same rule is overridden or rejected 3 or more times within 28 days, a row opens in `Rule_Review` and on the dashboard's Rules page. **Ask Gemini to propose rule changes** drafts a short suggestion from the reviewers' own reasons. Raghav and Deepa decide whether to edit `Rules_Config`. If more than 40% of all decisions are changed or rejected for four straight weeks, the rules are not matching Raghav's judgement and the adoption kill criterion is hit.
+The rules are Raghav's fixed thresholds (20% trend, 6 and 14 weeks, +25% festival, 3 to 4 weeks for perishables). They never change by themselves. Every override or rejection is logged with its reason and the rule flags that triggered it. When the same rule is overridden or rejected 3 or more times within 28 days, a row opens in `Rule_Review` and on the dashboard's Rules page. **Ask Gemini to propose rule changes** drafts a short suggestion from the reviewers' own reasons. Raghav and Deepa decide whether to edit `Rules_Config`. If more than 60% of all decisions have a changed quantity or are rejected for four straight weeks, the rules are not matching Raghav's judgement and the adoption kill criterion is hit.
 
 ## Decisions the build makes (all editable in Rules_Config)
 
@@ -105,7 +105,7 @@ The rules are Raghav's fixed thresholds (20% trend, 6 and 14 weeks, +25% festiva
 
 - Gemini only words numbers the engine computed. A reply with any other number is discarded and the template reason used.
 - A run aborts, without overwriting anything, if sales completeness is below 95%. Owners are emailed.
-- Each recommendation is decided once. Approve of a manual-review row is blocked; Reject and Override need a reason; Override to 0 records the change and orders nothing.
+- Each recommendation is decided once. Reject needs a reason; so does changing the quantity (that is stored as an "Override" in the logs: Raghav approved, but not as the rules recommended). A manual-review row has no recommended quantity, so Raghav types one and says why. A PAUSE recommendation starts at 0: Approve skips the order, a quantity orders anyway.
 - PO generation claims lines before numbering them, so two simultaneous requests cannot put a line on two POs; a failure puts the lines back so the next call retries.
 - The email web app and the machine endpoints need `SYNC_SECRET`; the dashboard needs a password.
 
@@ -115,3 +115,7 @@ The rules are Raghav's fixed thresholds (20% trend, 6 and 14 weeks, +25% festiva
 - Loss numbers for the Impact page come from finance by hand: the sales and stock data carry no prices.
 - Zoho Inventory is not used (it could not be set up). POs are generated in the app; sending them to a vendor is a download or an email, not an ERP push.
 - The shared password gate is fine for a project. For real use, move to per-user sign-in.
+
+## Look and feel
+
+The dashboard is styled for Freshroots: soft glass cards over a light garden background, translucent fruit and vegetables floating behind, a vine that grows down the right edge as you scroll (click or drag it to jump), and little sprouts and leaves popping up on the corners of the cards. Animations switch off for visitors who prefer reduced motion.
