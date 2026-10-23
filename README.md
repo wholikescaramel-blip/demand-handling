@@ -2,7 +2,7 @@
 
 One web app on **Vercel** with **Neon** as its only database. The dashboard is the front end; every piece of data (SKUs, distributors, sales, stock, the festival calendar, Raghav's rules, decisions, purchase orders) lives in Neon and is changed from the dashboard. There is no Apps Script, Drive or Sheet any more.
 
-Raghav's rules *recommend*. Raghav presses **Approve** or **Reject** on each SKU; an approval creates that line's **purchase order** (PDF in a standard supplier-PO layout), which can be downloaded or emailed. **Gemini** only words the reasons, and only with numbers the rules produced.
+Raghav's rules *recommend*. Raghav presses **Approve** or **Reject** on each SKU; an approval creates that line's **purchase order** (PDF in a standard supplier-PO layout), which can be downloaded. **Gemini** only words the reasons, and only with numbers the rules produced.
 
 Components map: `docs/demand_planning_components_map_v6.png`. Sample PO: `docs/sample_purchase_order.pdf`.
 
@@ -13,7 +13,7 @@ Components map: `docs/demand_planning_components_map_v6.png`. Sample PO: `docs/s
 | **Overview** | Numbers at a glance, guardrails, charts, and the **Impact** section (weekly losses vs the pre-AI baseline, day-90 verdict, a small form to add a week). A **Rules and thresholds** dropdown shows every number in use (read only). **Run planning now** applies the rules to what is in Neon. |
 | **Stock** | Every SKU, most urgent first: in hand, on order, demand per week, weeks of cover against its target band, status and the gap in units. |
 | **Review** | For Raghav and Deepa (pick your name in the top bar; there is no login). Each flagged SKU has **Approve**, **Edit** (change the quantity, reason needed) or **Reject** (reason needed). Approve creates the PO right away. The full decision history is below. |
-| **Purchase orders** | Every PO: preview, download, email, mark received. |
+| **Purchase orders** | Every PO: preview, download, mark received. |
 
 Data (SKUs, sales, stock, distributors) and the rule numbers are maintained in Neon by the backend (`npm run seed` loads the CSVs), not in the dashboard.
 
@@ -35,7 +35,6 @@ Data (SKUs, sales, stock, distributors) and the rule numbers are maintained in N
 | `DATABASE_URL` | yes | Neon connection string |
 | `CRON_SECRET` | for the schedule | Any long random string; lets Vercel's Tue/Fri cron call `/api/cron/run` |
 | `GEMINI_API_KEY` | optional | Gemini words the reasons. Without it the standard wording is used. |
-| `SMTP_USER`, `SMTP_PASS` | optional | Email POs from the dashboard. Gmail: an app password (Google account > Security > 2-Step Verification > App passwords). Without them, Download still works. |
 | `COMPANY_*`, `SHIP_TO`, `PAYMENT_TERMS`, `PO_TERMS`, `OPEN_PO_DAYS` | optional | Company block and wording on the PO (see `dashboard/.env.example`) |
 
 3. Open **Data** and upload your CSVs, in this order: distributors, SKUs, weekly sales, stock, calendar. (To do it from a terminal instead: put the values in `dashboard/.env.local`, then `npm run db:migrate` and `npm run seed` in `dashboard/`. That loads the five CSV files from the repo root, and is safe to repeat.)
@@ -61,7 +60,7 @@ Title, company block, supplier panel (name, address, GSTIN, contact, email, supp
 
 ## Re-evaluating the rules
 
-The thresholds are Raghav's and never change by themselves. Every quantity change and every rejection is logged with its reason and the rule that fired. When one rule is changed or rejected `Open a rule review after this many changes` times (3) within 28 days, it appears under **Waiting for a second look** in the Overview rules dropdown. Gemini can draft a short suggestion from Raghav's own reasons; Raghav and Deepa decide whether to edit the number in the Neon `rules` table. If more than **60%** of decisions have a changed quantity or are rejected for four straight weeks, the rules do not match Raghav's judgement: that is the adoption kill criterion.
+The thresholds are Raghav's and never change by themselves. Every quantity change and every rejection is logged with its reason and the rule that fired. When one rule is changed or rejected `Open a rule review after this many changes` times (3) within 28 days, it appears under **Waiting for a second look** in the Overview rules dropdown. Gemini can draft a short suggestion from Raghav's own reasons; Raghav and Deepa decide whether to edit the number in the Neon `rules` table. If more than **45%** of decisions have a changed quantity or are rejected for four straight weeks, the rules do not match Raghav's judgement: that is the adoption kill criterion.
 
 ## Impact and the day-90 kill switch
 
@@ -69,7 +68,7 @@ Finance enters one row per week (stockout losses, overstock write-offs, the peri
 
 ## Code map (`dashboard/`)
 
-`lib/engine.ts` (rules, pure) · `lib/rules.ts` (defaults and validation) · `lib/planning.ts` (the run) · `lib/decisions.ts` + `lib/po.ts` (Approve/Reject rules) · `lib/orders.ts` + `lib/pdf.ts` (POs) · `lib/importers.ts` + `lib/store.ts` + `lib/csv.ts` (CSV in and out of Neon) · `lib/gemini.ts` · `lib/feedback.ts` · `lib/impact.ts` · `lib/mail.ts` · `db/schema.sql` · `app/` (pages and server actions) · `vercel.json` (the Tue/Fri cron).
+`lib/engine.ts` (rules, pure) · `lib/rules.ts` (defaults and validation) · `lib/planning.ts` (the run) · `lib/decisions.ts` + `lib/po.ts` (Approve/Reject rules) · `lib/orders.ts` + `lib/pdf.ts` (POs) · `lib/importers.ts` + `lib/store.ts` + `lib/csv.ts` (CSV in and out of Neon) · `lib/gemini.ts` · `lib/feedback.ts` · `lib/impact.ts` · `db/schema.sql` · `app/` (pages and server actions) · `vercel.json` (the Tue/Fri cron).
 
 ## Tests
 

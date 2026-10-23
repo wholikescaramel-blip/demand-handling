@@ -1,10 +1,10 @@
 import { getSnapshot } from "@/lib/data";
-import { mailConfigured } from "@/lib/mail";
 import { ActionPill, DecisionPill, PoPill, fmtDateTime } from "@/components/ui";
 import { DecisionForm } from "@/components/DecisionForm";
 import { PoActions } from "@/components/PoActions";
 import { NotConnected } from "@/components/NotConnected";
-import { createPoForLine, decide } from "./actions";
+import { loadStock } from "@/lib/planning";
+import { createPoForLine, decide, runPlanningNow } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const live = run?.mode === "LIVE";
   const pending = live ? snap.recs.filter((r) => !r.decision) : [];
   const decided = live ? snap.recs.filter((r) => r.decision) : [];
-  const emailOn = mailConfigured();
+  // SKUs the rules cannot judge (new, or no stock/sales data) that are not in the latest run yet, e.g. after stock was edited in Neon
+  const inRun = new Set(snap.recs.map((r) => r.sku));
+  const stock = await loadStock();
+  const waitingForRun = stock.ok ? stock.rows.filter((r) => r.action === "MANUAL_REVIEW" && (r.status === "NEW" || r.status === "NO_DATA") && !inRun.has(r.sku)) : [];
   const poBy = new Map(snap.pos.map((p) => [p.po_number, p]));
 
   return (
@@ -47,6 +50,21 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
 
       {error ? <div className="banner bad" role="alert">{error}</div> : null}
       {ok ? <div className="banner good" role="status">{ok}</div> : null}
+
+      {waitingForRun.length ? (
+        <section className="card" style={{ borderLeft: "4px solid var(--manual)" }}>
+          <div className="head">
+            <div>
+              <h2>Needs manual info ({waitingForRun.length})</h2>
+              <p className="small dim" style={{ margin: 0 }}>
+                The rules have no data to judge {waitingForRun.length === 1 ? "this SKU" : "these SKUs"}: {waitingForRun.map((r) => `${r.sku} (${r.status === "NEW" ? "new, short history" : "no stock or sales data"})`).join(", ")}.
+                Run planning and {waitingForRun.length === 1 ? "it appears" : "they appear"} below as a manual card where a person enters the quantity and the reason.
+              </p>
+            </div>
+            <form action={runPlanningNow}><button className="btn primary" type="submit">Run planning now</button></form>
+          </div>
+        </section>
+      ) : null}
 
       {run && !live ? (
         <section className="card">
@@ -117,7 +135,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                   {po ? (
                     <div style={{ marginTop: 10 }}>
                       <div style={{ fontWeight: 700, marginBottom: 6 }}>Purchase order {po.po_number}</div>
-                      <PoActions po={po} emailOn={emailOn} from="review" defaultTo={snap.vendorEmails?.[po.vendor_key] ?? po.vendor?.email ?? ""} />
+                      <PoActions po={po} />
                     </div>
                   ) : r.po_status === "READY" ? (
                     <form action={createPoForLine} style={{ marginTop: 10 }}>

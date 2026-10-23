@@ -124,5 +124,4 @@ export type Snapshot = {
   ruleReviews: RuleReview[];
   pos: PurchaseOrder[]; // newest first
   impact: { entries: LossEntry[]; settings: ImpactSettings };
-  vendorEmails?: Record<string, string>; // last address used per vendor
 };

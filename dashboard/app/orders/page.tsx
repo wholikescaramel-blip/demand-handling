@@ -1,5 +1,4 @@
 import { getSnapshot } from "@/lib/data";
-import { mailConfigured } from "@/lib/mail";
 import { Kpi, PoPill, fmtDateTime } from "@/components/ui";
 import { NotConnected } from "@/components/NotConnected";
 import { PoActions } from "@/components/PoActions";
@@ -15,13 +14,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   if (!snap) return <NotConnected />;
   const waiting = snap.decisions.filter((d) => d.po_status === "READY");
   const onOrder = snap.pos.filter((p) => !p.received_at);
-  const emailOn = mailConfigured();
 
   return (
     <>
       <h1>Purchase orders</h1>
       <p className="sub">
-        Every approval creates one numbered PO. Download it, or email it to the vendor from here. Nothing is created without Raghav or Deepa approving.
+        Every approval creates one numbered PO. Download the PDF and send it to the vendor yourself. Nothing is created without Raghav or Deepa approving.
       </p>
 
       {error ? <div className="banner bad" role="alert">{error}</div> : null}
@@ -31,7 +29,6 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       <section className="grid kpis">
         <Kpi label="POs created" value={snap.pos.length} note="one per approval" />
         <Kpi label="On order" value={onOrder.length} note="not yet marked received; counts as stock on order" />
-        <Kpi label="Emailed" value={snap.pos.filter((p) => p.sent_at).length} note={emailOn ? "sent from this page" : "email not set up; download instead"} />
         <Kpi label="Approved, PO missing" value={waiting.length} note="only if creating a PO failed" />
       </section>
 
@@ -73,7 +70,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               </div>
             </div>
             <p className="small" style={{ margin: "10px 0" }}>{p.lines.map((l) => `${l.sku} ${l.name ?? ""} × ${l.qty}`).join("  ·  ")}</p>
-            <PoActions po={p} emailOn={emailOn} from="orders" defaultTo={snap.vendorEmails?.[p.vendor_key] ?? p.vendor?.email ?? ""} />
+            <PoActions po={p} />
             <div style={{ marginTop: 10 }}>
               {p.received_at ? (
                 <span className="pill ok">Received {fmtDateTime(p.received_at)}</span>

@@ -111,7 +111,6 @@ test("buildPoPdf produces a real PDF, including a long multi-page order", async 
 });
 
 import { lineAmount, poOptionsFromEnv, DEFAULT_TERMS } from "../lib/pdf.ts";
-import { validEmail } from "../lib/mail.ts";
 
 test("lineAmount: quantity x rate x (1 + tax), or null without a rate", () => {
   assert.equal(lineAmount({ qty: 20, rate: 600, tax_pct: 5 }), 12600);
@@ -146,9 +145,3 @@ test("buildPoPdf renders a priced PO with vendor details", async () => {
   assert.equal((await PDFDocument.load(bytes)).getPageCount(), 1);
 });
 
-test("validEmail accepts normal addresses and rejects junk", () => {
-  assert.equal(validEmail("vendor@example.com"), true);
-  assert.equal(validEmail(" vendor@example.co.in "), true);
-  assert.equal(validEmail("vendor@"), false);
-  assert.equal(validEmail("not an email"), false);
-});

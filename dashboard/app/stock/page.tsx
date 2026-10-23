@@ -10,8 +10,8 @@ const STATUS: Record<StockStatus, { label: string; cls: string }> = {
   OVERSTOCK: { label: "Overstock", cls: "warn" },
   HIGH_DEMAND: { label: "High demand", cls: "warn" },
   OK: { label: "In range", cls: "ok" },
-  NEW: { label: "New SKU", cls: "na" },
-  NO_DATA: { label: "No stock record", cls: "na" },
+  NEW: { label: "Manual: new SKU", cls: "manual" },
+  NO_DATA: { label: "Manual: no data", cls: "manual" },
 };
 
 /** Cover against its target band: a bar that runs to 2x the ceiling with the band shaded. */

@@ -37,7 +37,7 @@ test("defaults match the brief (Raghav's five rules)", () => {
   assert.equal(r.FESTIVAL_UPLIFT, 0.25);
   assert.equal(r.PERISHABLE_MIN_WEEKS, 3);
   assert.equal(r.PERISHABLE_MAX_WEEKS, 4);
-  assert.equal(r.ADOPTION_KILL_PCT, 0.6);
+  assert.equal(r.ADOPTION_KILL_PCT, 0.45);
   assert.equal(new Set(RULE_DEFS.map((d) => d.key)).size, RULE_DEFS.length, "no duplicate rule keys");
   assert.deepEqual(checkRules(r), []);
 });

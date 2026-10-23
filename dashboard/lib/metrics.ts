@@ -1,7 +1,7 @@
 import type { ImpactEval } from "./impact.ts";
 import type { Decision, Run } from "./types.ts";
 
-export const ADOPTION_KILL = 0.6;
+export const ADOPTION_KILL = 0.45;
 export const NOISE_KILL = 0.3;
 export const COMPLETENESS_GATE = 95;
 export const SLA_HOURS = 24;

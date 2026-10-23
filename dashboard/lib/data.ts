@@ -11,7 +11,7 @@ const num = (v: unknown): number | null => (v === null || v === undefined ? null
 export async function getSnapshot(): Promise<Snapshot | null> {
   if (!dbConfigured()) return null;
   const sql = getSql();
-  const [runRows, decisionRows, reviewRows, poRows, lossRows, settingRows, firstLive, distRows] = await Promise.all([
+  const [runRows, decisionRows, reviewRows, poRows, lossRows, settingRows, firstLive] = await Promise.all([
     sql`select * from runs order by run_at desc limit 40`,
     sql`select d.*, r.name from decisions d left join recommendations r on r.run_id = d.run_id and r.sku = d.sku order by d.decided_at desc limit 500`,
     sql`select * from rule_reviews order by opened_at desc limit 50`,
@@ -19,7 +19,6 @@ export async function getSnapshot(): Promise<Snapshot | null> {
     sql`select week_start::text as week_start, stockout_loss, overstock_writeoff, perishable_part, note, entered_by from loss_entries order by week_start`,
     sql`select key, value from settings`,
     sql`select min(run_at) as at from runs where mode = 'LIVE' and status = 'OK'`,
-    sql`select distributor_id, email from distributors where email is not null`,
   ]);
 
   const runs: Run[] = runRows.map((r) => ({
@@ -71,12 +70,7 @@ export async function getSnapshot(): Promise<Snapshot | null> {
     firstLive[0]?.at ? iso(firstLive[0].at) : null,
   );
 
-  // Vendor emails: the distributor's own address, overridden by the last address a PO was sent to.
-  const vendorEmails: Record<string, string> = {};
-  for (const r of distRows) if (r.email) vendorEmails[String(r.distributor_id)] = String(r.email);
-  for (const r of settingRows) if (String(r.key).startsWith("email:") && r.value) vendorEmails[String(r.key).slice(6)] = String(r.value);
-
-  return { runs, latestRun, recs, decisions, ruleReviews, pos: poRows.map(mapPo), impact: { entries, settings }, vendorEmails };
+  return { runs, latestRun, recs, decisions, ruleReviews, pos: poRows.map(mapPo), impact: { entries, settings } };
 }
 
 function mapPo(p: Row): PurchaseOrder {
