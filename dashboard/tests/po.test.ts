@@ -93,3 +93,46 @@ test("buildPoPdf produces a real PDF, including a long multi-page order", async 
   assert.ok(pages >= 3, `expected a multi-page PO, got ${pages}`);
   assert.equal((await PDFDocument.load(small)).getPageCount(), 1);
 });
+
+import { lineAmount, poOptionsFromEnv, DEFAULT_TERMS } from "../lib/pdf.ts";
+import { validEmail } from "../lib/mail.ts";
+
+test("lineAmount: quantity x rate x (1 + tax), or null without a rate", () => {
+  assert.equal(lineAmount({ qty: 20, rate: 600, tax_pct: 5 }), 12600);
+  assert.equal(lineAmount({ qty: 10, rate: 50 }), 500);
+  assert.equal(lineAmount({ qty: 10, rate: null }), null);
+});
+
+test("poOptionsFromEnv: defaults, and values from the environment", () => {
+  const d = poOptionsFromEnv({});
+  assert.equal(d.company?.name, "Freshroots");
+  assert.deepEqual(d.shipTo, ["Freshroots", "Pune Central Warehouse, Pune"]);
+  assert.equal(d.expiryDays, 7);
+  assert.deepEqual(d.terms, DEFAULT_TERMS);
+  const e = poOptionsFromEnv({ COMPANY_NAME: "Acme", SHIP_TO: "Acme|Plot 4|Nashik", PO_EXPIRY_DAYS: "10", PO_TERMS: "One|Two", PAYMENT_TERMS: "Net 30" });
+  assert.deepEqual(e.shipTo, ["Acme", "Plot 4", "Nashik"]);
+  assert.equal(e.expiryDays, 10);
+  assert.deepEqual(e.terms, ["One", "Two"]);
+  assert.equal(e.paymentTerms, "Net 30");
+});
+
+test("buildPoPdf renders a priced PO with vendor details", async () => {
+  const bytes = await buildPoPdf(
+    {
+      po_number: "DP-2026-0002", created_at: "2026-10-23T09:15:00+05:30", vendor_name: "GrainPath Logistics", vendor_key: "DIST002",
+      vendor: { key: "DIST002", name: "GrainPath Logistics", address: "12 Market Road, Pune", gstin: "27ABCDE1234F1Z5", contact: "+91 98000 00000", email: "po@grainpath.example" },
+      run_ids: "R1", created_by: "Raghav", total_qty: 300, total_amount: 300 * 40 * 1.05,
+      lines: [{ run_id: "R1", sku: "SKU003", name: "Freshroots Brown Rice 1kg", qty: 300, unit: "nos", hsn: "10063020", rate: 40, tax_pct: 5 }],
+    },
+    { company: { name: "Freshroots", email: "purchase@freshroots.example" } },
+  );
+  assert.equal(Buffer.from(bytes.slice(0, 5)).toString(), "%PDF-");
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 1);
+});
+
+test("validEmail accepts normal addresses and rejects junk", () => {
+  assert.equal(validEmail("vendor@example.com"), true);
+  assert.equal(validEmail(" vendor@example.co.in "), true);
+  assert.equal(validEmail("vendor@"), false);
+  assert.equal(validEmail("not an email"), false);
+});

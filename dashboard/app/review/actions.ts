@@ -6,6 +6,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { checkDecision } from "@/lib/po";
 import { generateIfRunComplete, generatePosForReady } from "@/lib/orders";
+import { getPo } from "@/lib/data";
+import { buildPoPdf, poOptionsFromEnv } from "@/lib/pdf";
+import { mailConfigured, sendMailViaWebApp, validEmail } from "@/lib/mail";
 
 const back = (params: Record<string, string>) => `/review?${new URLSearchParams(params).toString()}`;
 
@@ -79,4 +82,36 @@ export async function markReceived(formData: FormData) {
   await sql`update purchase_orders set received_at = now() where po_number = ${String(formData.get("po_number") ?? "")} and received_at is null`;
   revalidatePath("/orders");
   redirect("/orders");
+}
+
+/** Email a PO's PDF to the vendor (or anyone) through the Apps Script mail web app. */
+export async function sendPoEmail(formData: FormData) {
+  if (!process.env.DATABASE_URL) redirect("/orders?error=" + encodeURIComponent("Demo mode: connect a database first."));
+  const po_number = String(formData.get("po_number") ?? "");
+  const to = String(formData.get("to") ?? "").trim();
+  if (!validEmail(to)) redirect("/orders?error=" + encodeURIComponent(`Enter a valid email address for ${po_number}.`));
+  if (!mailConfigured()) redirect("/orders?error=" + encodeURIComponent("Email is not set up yet. You can still download the PDF."));
+
+  const po = await getPo(po_number);
+  if (!po) redirect("/orders?error=" + encodeURIComponent("That purchase order no longer exists."));
+  const opts = poOptionsFromEnv();
+  const pdf = await buildPoPdf(po!, opts);
+  const company = opts.company?.name ?? "Freshroots";
+  const r = await sendMailViaWebApp({
+    to,
+    subject: `Purchase order ${po!.po_number} from ${company}`,
+    body:
+      `Dear ${po!.vendor?.name ?? po!.vendor_name ?? "supplier"},\n\nPlease find purchase order ${po!.po_number} attached: ${po!.lines.length} item(s), ${po!.total_qty} units.\n` +
+      `Please confirm the rates and the delivery date when you accept it, and quote the PO number on the delivery note and invoice.\n\n` +
+      `Approved by ${po!.created_by ?? "our demand planner"}.\n\nRegards,\n${company}`,
+    filename: `${po!.po_number}.pdf`,
+    pdf,
+  });
+  if (!r.ok) redirect("/orders?error=" + encodeURIComponent(r.error));
+
+  const sql = neon(process.env.DATABASE_URL!);
+  await sql`update purchase_orders set sent_at = now(), sent_to = ${to} where po_number = ${po_number}`;
+  await sql`insert into settings (key, value) values (${"email:" + po!.vendor_key}, ${to}) on conflict (key) do update set value = excluded.value`;
+  revalidatePath("/orders");
+  redirect(`/orders?sent=${encodeURIComponent(po_number)}`);
 }

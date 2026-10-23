@@ -47,7 +47,14 @@ function runPipeline() {
     if (expired) notes.push(expired + ' undecided row(s) from the previous run marked EXPIRED');
 
     var distNames = {};
-    readTable_(SHEETS.DIST).forEach(function (d) { distNames[d.Distributor_ID] = d.Distributor_Name; });
+    var vendors = [];
+    readTable_(SHEETS.DIST).forEach(function (d) {
+      distNames[d.Distributor_ID] = d.Distributor_Name;
+      vendors.push({
+        key: String(d.Distributor_ID), name: d.Distributor_Name || null, region: d.Region || null, address: d.Address || null,
+        gstin: d.GSTIN || null, contact: d.Contact ? String(d.Contact) : null, email: d.Email || null
+      });
+    });
     var countAction = function (a) { return result.recs.filter(function (r) { return r.action === a; }).length; };
     var push = pushToDashboard_({
       type: 'run',
@@ -59,7 +66,8 @@ function runPipeline() {
         gemini_tokens: expl.tokens + summary.tokens, summary: summary.text, notes: notes.join(' | '),
         review_due_at: isoNow_(new Date(Date.now() + rules.REVIEW_SLA_HOURS * 3600 * 1000))
       },
-      recs: result.recs.map(function (r) { return recForDashboard_(r, expl.source[r.sku], distNames); })
+      recs: result.recs.map(function (r) { return recForDashboard_(r, expl.source[r.sku], distNames); }),
+      vendors: vendors
     });
     if (push.ok === false) notes.push(push.error);
     appendRows_(SHEETS.RUNS, RUN_HEADER, [[runId, now, ing.asOf, mode, result.skuCount, ing.stats.completeness, result.recs.length,

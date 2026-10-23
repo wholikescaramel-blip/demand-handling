@@ -1,3 +1,4 @@
+import type { ImpactEval } from "./impact.ts";
 import type { Decision, Run } from "./types.ts";
 
 export const ADOPTION_KILL = 0.4;
@@ -93,7 +94,7 @@ export type KillCheck = {
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-export function killChecks(latest: Run | null, stats: DecisionStats, weekly: WeekPoint[]): KillCheck[] {
+export function killChecks(latest: Run | null, stats: DecisionStats, weekly: WeekPoint[], impact?: ImpactEval): KillCheck[] {
   const checks: KillCheck[] = [];
 
   checks.push(
@@ -142,6 +143,17 @@ export function killChecks(latest: Run | null, stats: DecisionStats, weekly: Wee
           rule: "Aim for 80% or more",
         },
   );
+
+  if (impact) {
+    const rule = `Shift back to manual if losses are under 10% lower at day ${impact.horizon}`;
+    const name = "Outcome (losses vs pre-AI baseline)";
+    if (impact.phase === "not_started") checks.push({ name, status: "na", value: "tracking not started", rule });
+    else if (impact.reductionPct === null) checks.push({ name, status: "na", value: `day ${impact.day} of ${impact.horizon}, ${impact.weeks} week(s) logged`, rule });
+    else {
+      const status = impact.status === "on_target" ? "ok" : impact.status === "improving" ? "warn" : impact.phase === "decision" ? "breach" : "warn";
+      checks.push({ name, status, value: `${Math.round(impact.reductionPct * 100)}% lower, day ${impact.day} of ${impact.horizon}`, rule });
+    }
+  }
 
   checks.push({
     name: "Harm (perishable write-offs)",

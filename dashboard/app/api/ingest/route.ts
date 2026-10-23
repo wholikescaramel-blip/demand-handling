@@ -25,7 +25,9 @@ const Rec = z.object({
   rec_qty: nint, priority: nint, on_hand: nint, open_po: nint, cover_weeks: nint, trend_pct: nint,
   flags: nstr, reason: nstr, reason_source: nstr, data_notes: nstr,
   distributor_id: nstr, distributor_name: nstr,
+  unit: nstr, hsn: nstr, unit_cost: nint, tax_pct: nint,
 });
+const Vendor = z.object({ key: z.string().min(1), name: nstr, region: nstr, address: nstr, gstin: nstr, contact: nstr, email: nstr });
 const Decision = z.object({
   decided_at: z.string(), run_id: z.string(), sku: z.string(), action: nstr, rec_qty: nint, flags: nstr, priority: nint,
   decision: z.string(), final_qty: nint, reason: nstr, reviewer: nstr, hours_to_decide: nint,
@@ -35,7 +37,7 @@ const RuleReview = z.object({
 });
 
 const Body = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("run"), run: Run, recs: z.array(Rec).default([]) }),
+  z.object({ type: z.literal("run"), run: Run, recs: z.array(Rec).default([]), vendors: z.array(Vendor).default([]) }),
   z.object({ type: z.literal("decisions"), decisions: z.array(Decision) }),
   z.object({ type: z.literal("rule_reviews"), items: z.array(RuleReview) }),
 ]);
@@ -69,15 +71,26 @@ export async function POST(req: Request) {
     for (const c of body.recs) {
       await sql`
         insert into recommendations (run_id, sku, name, perishable, action, rec_qty, priority, on_hand, open_po, cover_weeks,
-                                     trend_pct, flags, reason, reason_source, data_notes, distributor_id, distributor_name)
+                                     trend_pct, flags, reason, reason_source, data_notes, distributor_id, distributor_name,
+                                     unit, hsn, unit_cost, tax_pct)
         values (${r.run_id}, ${c.sku}, ${c.name ?? null}, ${c.perishable ?? null}, ${c.action}, ${c.rec_qty ?? null}, ${c.priority ?? null},
                 ${c.on_hand ?? null}, ${c.open_po ?? null}, ${c.cover_weeks ?? null}, ${c.trend_pct ?? null}, ${c.flags ?? null},
-                ${c.reason ?? null}, ${c.reason_source ?? null}, ${c.data_notes ?? null}, ${c.distributor_id ?? null}, ${c.distributor_name ?? null})
+                ${c.reason ?? null}, ${c.reason_source ?? null}, ${c.data_notes ?? null}, ${c.distributor_id ?? null}, ${c.distributor_name ?? null},
+                ${c.unit ?? null}, ${c.hsn ?? null}, ${c.unit_cost ?? null}, ${c.tax_pct ?? null})
         on conflict (run_id, sku) do update set
           name = excluded.name, perishable = excluded.perishable, action = excluded.action, rec_qty = excluded.rec_qty,
           priority = excluded.priority, on_hand = excluded.on_hand, open_po = excluded.open_po, cover_weeks = excluded.cover_weeks,
           trend_pct = excluded.trend_pct, flags = excluded.flags, reason = excluded.reason, reason_source = excluded.reason_source,
-          data_notes = excluded.data_notes, distributor_id = excluded.distributor_id, distributor_name = excluded.distributor_name`;
+          data_notes = excluded.data_notes, distributor_id = excluded.distributor_id, distributor_name = excluded.distributor_name,
+          unit = excluded.unit, hsn = excluded.hsn, unit_cost = excluded.unit_cost, tax_pct = excluded.tax_pct`;
+    }
+    for (const v of body.vendors) {
+      await sql`
+        insert into vendors (vendor_key, name, region, address, gstin, contact, email)
+        values (${v.key}, ${v.name ?? null}, ${v.region ?? null}, ${v.address ?? null}, ${v.gstin ?? null}, ${v.contact ?? null}, ${v.email ?? null})
+        on conflict (vendor_key) do update set
+          name = excluded.name, region = excluded.region, address = excluded.address, gstin = excluded.gstin,
+          contact = excluded.contact, email = excluded.email`;
     }
     // A new live run closes anything the previous live run left undecided, so it is counted rather than lost.
     if (r.mode === "LIVE" && r.status === "OK") {

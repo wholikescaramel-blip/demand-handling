@@ -1,3 +1,5 @@
+import type { ImpactSettings, LossEntry } from "./impact.ts";
+
 export type Run = {
   run_id: string;
   run_at: string; // ISO
@@ -77,18 +79,39 @@ export type RuleReview = {
   status: string;
 };
 
-export type PoLineRow = { run_id: string; sku: string; name: string | null; qty: number };
+export type PoLineRow = {
+  run_id: string;
+  sku: string;
+  name: string | null;
+  qty: number;
+  unit?: string | null;
+  hsn?: string | null;
+  rate?: number | null; // purchase rate per unit, when sku_master has Unit_Cost
+  tax_pct?: number | null;
+};
+
+export type VendorInfo = {
+  key: string;
+  name: string | null;
+  address: string | null;
+  gstin: string | null;
+  contact: string | null;
+  email: string | null;
+};
 
 export type PurchaseOrder = {
   po_number: string;
   created_at: string; // ISO
   vendor_key: string;
   vendor_name: string | null;
+  vendor?: VendorInfo | null;
   run_ids: string | null;
   created_by: string | null;
   total_qty: number;
+  total_amount?: number | null; // Rs incl. tax, only when every line has a rate
   lines: PoLineRow[];
-  delivered_at: string | null; // filed in Drive / emailed by Apps Script
+  sent_at: string | null; // emailed from the dashboard
+  sent_to: string | null;
   received_at: string | null; // goods received: stops counting as stock on order
 };
 
@@ -100,4 +123,6 @@ export type Snapshot = {
   decisions: Decision[]; // newest first
   ruleReviews: RuleReview[];
   pos: PurchaseOrder[]; // newest first
+  impact: { entries: LossEntry[]; settings: ImpactSettings };
+  vendorEmails?: Record<string, string>; // last address used per vendor
 };

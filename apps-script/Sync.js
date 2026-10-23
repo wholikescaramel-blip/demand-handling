@@ -40,7 +40,9 @@ function recForDashboard_(rec, source, distNames) {
     rec_qty: rec.qty === null ? null : rec.qty, priority: rec.priority, on_hand: rec.onHand, open_po: rec.openPo,
     cover_weeks: rec.coverWeeks, trend_pct: rec.trendPct, flags: rec.flags.join(' + '),
     reason: rec.reason, reason_source: source || 'template', data_notes: rec.dq.join('; '),
-    distributor_id: rec.distributor || null, distributor_name: (distNames || {})[rec.distributor] || null
+    distributor_id: rec.distributor || null, distributor_name: (distNames || {})[rec.distributor] || null,
+    unit: rec.unit || null, hsn: rec.hsn || null,
+    unit_cost: typeof rec.unitCost === 'number' ? rec.unitCost : null, tax_pct: typeof rec.taxPct === 'number' ? rec.taxPct : null
   };
 }
 
@@ -167,11 +169,9 @@ function pullDecisions_() {
   return { ok: true, added: logRows.length, updated: updated };
 }
 
-/** Trigger (hourly) and menu entry: mirror decisions back, then file and email any new PO PDFs. */
+/** Trigger (hourly) and menu entry: mirror the dashboard's decisions and PO numbers into the Sheet. */
 function pullDecisions() {
   var r = pullDecisions_();
-  var d = deliverPos_();
-  if (d.ok === false) appendRows_(SHEETS.RUNS, RUN_HEADER, [['DELIVER', fmtDate_(new Date()), '', '', '', '', '', '', '', '', '', 'PO DELIVERY FAILED', d.error]], [2]);
   if (r.ok === false) appendRows_(SHEETS.RUNS, RUN_HEADER, [['PULL', fmtDate_(new Date()), '', '', '', '', '', '', '', '', '', 'PULL FAILED', r.error]], [2]);
   return r;
 }
@@ -180,73 +180,5 @@ function pullDecisionsFromMenu() {
   var ui = SpreadsheetApp.getUi();
   if (!dashboardMode_()) { ui.alert('Set DASHBOARD_URL and SYNC_SECRET first (Configure).'); return; }
   var r = pullDecisions_();
-  var d = deliverPos_();
-  ui.alert(r.ok === false ? 'Could not reach the dashboard: ' + r.error :
-    'Pulled ' + r.added + ' new decision(s); filled ' + r.updated + ' PO number(s).' +
-    (d.ok === false ? '\n\nPO delivery failed: ' + d.error : '\nFiled and sent ' + (d.delivered || 0) + ' purchase order PDF(s).'));
-}
-
-var PO_HEADER = ['PO number', 'Vendor', 'Created', 'Units', 'Lines', 'Approved by', 'Drive file', 'Emailed to'];
-
-/** The "Purchase Orders" folder inside the CSV folder, created on first use. */
-function poFolder_() {
-  var parent = DriveApp.getFolderById(prop_('DRIVE_FOLDER_ID'));
-  var it = parent.getFoldersByName('Purchase Orders');
-  return it.hasNext() ? it.next() : parent.createFolder('Purchase Orders');
-}
-
-/**
- * New purchase orders from the dashboard: save each PDF in Drive, email it to procurement, log it in the
- * Purchase_Orders tab, then tell the dashboard it has been delivered. Safe to re-run: a PO already in the tab is
- * not filed or emailed twice, only marked delivered.
- * Returns {ok, delivered} or {ok:false, error}.
- */
-function deliverPos_() {
-  if (!dashboardMode_()) return { ok: true, delivered: 0, skipped: true };
-  if (!prop_('DRIVE_FOLDER_ID')) return { ok: false, error: 'DRIVE_FOLDER_ID is not set' };
-  var r = dashboardGet_('/api/pos');
-  if (!r.ok) return r;
-  var pos = r.json.pos || [];
-  if (!pos.length) return { ok: true, delivered: 0 };
-
-  var have = {};
-  readTable_(SHEETS.POS).forEach(function (p) { have[String(p['PO number'])] = true; });
-  var folder = poFolder_();
-  var to = prop_('PROCUREMENT_EMAIL');
-  var base = prop_('DASHBOARD_URL').replace(/\/+$/, '');
-  var rows = [], done = [], errors = [];
-
-  pos.forEach(function (po) {
-    try {
-      if (!have[po.po_number]) {
-        var resp = UrlFetchApp.fetch(base + '/api/po/' + encodeURIComponent(po.po_number), {
-          headers: { 'x-sync-secret': prop_('SYNC_SECRET') }, muteHttpExceptions: true
-        });
-        if (resp.getResponseCode() !== 200) throw new Error('PDF HTTP ' + resp.getResponseCode());
-        var blob = resp.getBlob().setName(po.po_number + '.pdf');
-        var file = folder.createFile(blob);
-        if (to) {
-          MailApp.sendEmail({
-            to: to,
-            subject: 'Purchase order ' + po.po_number + ' for ' + (po.vendor_name || po.vendor_key),
-            body: 'Approved by ' + (po.created_by || 'the demand planner') + '. ' + po.lines.length + ' line(s), ' + po.total_qty +
-              ' units. The PDF is attached; please send it to the vendor.\n\nFiled in Drive: ' + file.getUrl(),
-            attachments: [blob]
-          });
-        }
-        rows.push([po.po_number, po.vendor_name || po.vendor_key, fmtDate_(new Date(po.created_at)), po.total_qty, po.lines.length,
-          po.created_by || '', file.getUrl(), to || '(no PROCUREMENT_EMAIL set)']);
-      }
-      done.push(po.po_number);
-    } catch (e) {
-      errors.push(po.po_number + ': ' + String(e.message || e).slice(0, 100));
-    }
-  });
-  appendRows_(SHEETS.POS, PO_HEADER, rows, [3]);
-  if (done.length) {
-    var m = dashboardPost_('/api/pos', { po_numbers: done });
-    if (m.ok === false) errors.push('could not mark delivered: ' + m.error);
-  }
-  if (errors.length) return { ok: false, error: errors.join(' | '), delivered: done.length };
-  return { ok: true, delivered: done.length };
+  ui.alert(r.ok === false ? 'Could not reach the dashboard: ' + r.error : 'Pulled ' + r.added + ' new decision(s); filled ' + r.updated + ' PO number(s).');
 }

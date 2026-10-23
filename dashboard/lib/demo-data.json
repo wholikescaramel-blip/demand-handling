@@ -536,7 +536,8 @@
      "qty": 120
     }
    ],
-   "delivered_at": "2026-10-16T12:05:00+05:30",
+   "sent_at": "2026-10-16T12:05:00+05:30",
+   "sent_to": "orders@vendor.example",
    "received_at": null
   },
   {
@@ -561,7 +562,8 @@
      "qty": 300
     }
    ],
-   "delivered_at": "2026-10-16T12:05:00+05:30",
+   "sent_at": "2026-10-16T12:05:00+05:30",
+   "sent_to": "orders@vendor.example",
    "received_at": null
   },
   {
@@ -580,10 +582,88 @@
      "qty": 500
     }
    ],
-   "delivered_at": "2026-10-16T12:05:00+05:30",
+   "sent_at": "2026-10-16T12:05:00+05:30",
+   "sent_to": "orders@vendor.example",
    "received_at": null
   }
  ],
+ "impact": {
+  "entries": [
+   {
+    "week_start": "2026-08-31",
+    "stockout_loss": 155000,
+    "overstock_writeoff": 95000,
+    "perishable_part": 35000,
+    "note": null,
+    "entered_by": "demo"
+   },
+   {
+    "week_start": "2026-09-07",
+    "stockout_loss": 150000,
+    "overstock_writeoff": 90000,
+    "perishable_part": 30000,
+    "note": null,
+    "entered_by": "demo"
+   },
+   {
+    "week_start": "2026-09-14",
+    "stockout_loss": 140000,
+    "overstock_writeoff": 85000,
+    "perishable_part": 30000,
+    "note": null,
+    "entered_by": "demo"
+   },
+   {
+    "week_start": "2026-09-21",
+    "stockout_loss": 130000,
+    "overstock_writeoff": 80000,
+    "perishable_part": 25000,
+    "note": null,
+    "entered_by": "demo"
+   },
+   {
+    "week_start": "2026-09-28",
+    "stockout_loss": 125000,
+    "overstock_writeoff": 70000,
+    "perishable_part": 25000,
+    "note": null,
+    "entered_by": "demo"
+   },
+   {
+    "week_start": "2026-10-05",
+    "stockout_loss": 110000,
+    "overstock_writeoff": 70000,
+    "perishable_part": 20000,
+    "note": null,
+    "entered_by": "demo"
+   },
+   {
+    "week_start": "2026-10-12",
+    "stockout_loss": 100000,
+    "overstock_writeoff": 65000,
+    "perishable_part": 20000,
+    "note": "Illustrative demo entry",
+    "entered_by": "demo"
+   },
+   {
+    "week_start": "2026-10-19",
+    "stockout_loss": 95000,
+    "overstock_writeoff": 60000,
+    "perishable_part": 15000,
+    "note": null,
+    "entered_by": "demo"
+   }
+  ],
+  "settings": {
+   "go_live": "2026-08-31",
+   "baseline_low": 2800000,
+   "baseline_high": 3400000,
+   "baseline_perishable_quarter": 390000,
+   "horizon_days": 90,
+   "target_pct": 0.3,
+   "kill_pct": 0.1
+  }
+ },
  "ruleReviews": [
   {
    "opened_at": "2026-10-23T09:20:00+05:30",

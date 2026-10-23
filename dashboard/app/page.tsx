@@ -4,6 +4,7 @@ import {
 } from "@/lib/metrics";
 import { ActionPill, DecisionPill, DemoBanner, Kpi, KillChecks, fmtDateTime, pct } from "@/components/ui";
 import { ChangeRateChart, RunsChart } from "@/components/Charts";
+import { evaluateImpact } from "@/lib/impact";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,8 @@ export default async function Overview() {
   const run = snap.latestRun;
   const stats = decisionStats(snap.decisions);
   const weekly = weeklyChangeRate(snap.decisions);
-  const checks = killChecks(run, stats, weekly);
+  const impact = evaluateImpact(snap.impact.entries, snap.impact.settings, new Date().toISOString().slice(0, 10));
+  const checks = killChecks(run, stats, weekly, impact);
   const awaiting = run?.mode === "LIVE" ? snap.recs.filter((r) => !r.decision).length : null;
   const perMillion = process.env.GEMINI_COST_PER_MILLION_TOKENS_INR ? Number(process.env.GEMINI_COST_PER_MILLION_TOKENS_INR) : null;
   const tokens = snap.runs.reduce((s, r) => s + r.gemini_tokens, 0);

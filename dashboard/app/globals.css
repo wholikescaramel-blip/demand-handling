@@ -128,3 +128,6 @@ td.reason { min-width: 280px; max-width: 460px; }
 .reviewcontrols label { display: grid; gap: 4px; }
 .reviewcontrols input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 14px; width: 100%; min-width: 110px; }
 .reviewcontrols .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+a.btn { display: inline-block; text-decoration: none; }
+.reviewcontrols input:disabled { opacity: 0.55; }

@@ -94,12 +94,48 @@ create table if not exists purchase_orders (
   created_at   timestamptz not null default now(),
   vendor_key   text not null,
   vendor_name  text,
+  vendor       jsonb,                           -- address, GSTIN, contact, email at the time of the PO
   run_ids      text,
   created_by   text,
   total_qty    integer not null default 0,
+  total_amount double precision,                -- only when every line has a rate
   lines        jsonb not null default '[]'::jsonb,
-  delivered_at timestamptz,
+  sent_at      timestamptz,                     -- emailed from the dashboard
+  sent_to      text,
   received_at  timestamptz
 );
 
 create index if not exists purchase_orders_created_idx on purchase_orders (created_at desc);
+
+-- optional per-SKU purchase details (sku_master columns Unit_of_Measure, HSN_Code, Unit_Cost, Tax_Pct)
+alter table recommendations add column if not exists unit text;
+alter table recommendations add column if not exists hsn text;
+alter table recommendations add column if not exists unit_cost double precision;
+alter table recommendations add column if not exists tax_pct double precision;
+
+-- vendor details from distributor_master (optional columns Address, GSTIN, Contact, Email)
+create table if not exists vendors (
+  vendor_key text primary key,
+  name       text,
+  region     text,
+  address    text,
+  gstin      text,
+  contact    text,
+  email      text
+);
+
+-- v5: impact tracker. Weekly losses entered by finance/Raghav, compared with the pre-AI baseline.
+create table if not exists loss_entries (
+  week_start         date primary key,          -- Monday of the week
+  stockout_loss      bigint not null default 0, -- rupees of sales lost to stockouts
+  overstock_writeoff bigint not null default 0, -- rupees written off for overstock
+  perishable_part    bigint not null default 0, -- of the overstock write-off, how much was perishable
+  note               text,
+  entered_by         text,
+  entered_at         timestamptz not null default now()
+);
+
+create table if not exists settings (
+  key   text primary key,
+  value text
+);

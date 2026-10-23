@@ -26,13 +26,13 @@ function setup() {
   }
 
   var order = [SHEETS.RULES, SHEETS.REVIEW, SHEETS.APPROVED, SHEETS.REJECTIONS, SHEETS.DECISIONS, SHEETS.METRICS,
-    SHEETS.POS, SHEETS.RULE_REVIEW, SHEETS.SHADOW, SHEETS.RUNS, SHEETS.SALES, SHEETS.SKU, SHEETS.INV, SHEETS.INV_HIST,
+    SHEETS.RULE_REVIEW, SHEETS.SHADOW, SHEETS.RUNS, SHEETS.SALES, SHEETS.SKU, SHEETS.INV, SHEETS.INV_HIST,
     SHEETS.CAL, SHEETS.DIST, SHEETS.PO];
   order.forEach(function (name, i) {
     if (!ss.getSheetByName(name)) {
       var sh = ss.insertSheet(name);
       var headers = { Review: REVIEW_HEADER, Approved: APPROVED_HEADER, Rejections: REJECTION_HEADER, Decision_Log: DECISION_HEADER,
-        Shadow_Log: SHADOW_HEADER, Run_Log: RUN_HEADER, Purchase_Orders: PO_HEADER };
+        Shadow_Log: SHADOW_HEADER, Run_Log: RUN_HEADER };
       if (headers[name]) {
         sh.getRange(1, 1, 1, headers[name].length).setValues([headers[name]]).setFontWeight('bold').setBackground('#14213d').setFontColor('#ffffff');
         sh.setFrozenRows(1);
@@ -91,7 +91,7 @@ var CONFIG_KEYS_ = [
   ['GEMINI_MODEL', 'Gemini model, e.g. gemini-2.5-flash (blank = default)'],
   ['REVIEWER_EMAIL', "Raghav's email (gets 'ready to review' and overdue alerts)"],
   ['BACKUP_EMAIL', 'Backup approver email (gets overdue alerts)'],
-  ['PROCUREMENT_EMAIL', 'Procurement email (gets the approved list notice)'],
+  ['PROCUREMENT_EMAIL', 'Optional: procurement email (only used by the Sheet-only review mode)'],
   ['DASHBOARD_URL', 'Optional: web dashboard URL, e.g. https://your-app.vercel.app (blank = no dashboard)'],
   ['SYNC_SECRET', 'Optional: shared secret, must equal SYNC_SECRET in the dashboard environment']
 ];

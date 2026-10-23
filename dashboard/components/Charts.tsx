@@ -22,9 +22,9 @@ export function RunsChart({ data }: { data: RunPoint[] }) {
           <YAxis allowDecimals={false} tick={axis} stroke="var(--border)" />
           <Tooltip {...tip} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="reorder" name="Reorder" stackId="a" fill="var(--reorder)" />
-          <Bar dataKey="pause" name="Pause" stackId="a" fill="var(--pause)" />
-          <Bar dataKey="manual" name="Manual review" stackId="a" fill="var(--manual)" />
+          <Bar isAnimationActive={false} dataKey="reorder" name="Reorder" stackId="a" fill="var(--reorder)" />
+          <Bar isAnimationActive={false} dataKey="pause" name="Pause" stackId="a" fill="var(--pause)" />
+          <Bar isAnimationActive={false} dataKey="manual" name="Manual review" stackId="a" fill="var(--manual)" />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -43,7 +43,7 @@ export function ChangeRateChart({ data, kill }: { data: WeekPoint[]; kill: numbe
           <YAxis domain={[0, 100]} unit="%" tick={axis} stroke="var(--border)" />
           <Tooltip {...tip} formatter={(v) => [`${v}%`, "Override + reject"]} />
           <ReferenceLine y={kill * 100} stroke="var(--bad)" strokeDasharray="5 4" label={{ value: `${kill * 100}% kill line`, fill: "var(--bad)", fontSize: 12, position: "insideTopRight" }} />
-          <Line type="monotone" dataKey="pct" stroke="var(--reorder)" strokeWidth={2.5} dot={{ r: 4 }} />
+          <Line isAnimationActive={false} type="monotone" dataKey="pct" stroke="var(--reorder)" strokeWidth={2.5} dot={{ r: 4 }} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -60,7 +60,7 @@ export function TokensChart({ data }: { data: { label: string; tokens: number }[
           <XAxis dataKey="label" tick={axis} stroke="var(--border)" />
           <YAxis tick={axis} stroke="var(--border)" />
           <Tooltip {...tip} />
-          <Bar dataKey="tokens" name="Tokens" fill="var(--manual)" />
+          <Bar isAnimationActive={false} dataKey="tokens" name="Tokens" fill="var(--manual)" />
         </BarChart>
       </ResponsiveContainer>
     </div>

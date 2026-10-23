@@ -48,6 +48,10 @@ export type PoLine = {
   qty: number;
   vendor_key: string; // distributor id from SKU master
   vendor_name: string | null;
+  unit?: string | null;
+  hsn?: string | null;
+  rate?: number | null; // purchase rate per unit (sku_master Unit_Cost)
+  tax_pct?: number | null;
 };
 
 export type VendorGroup = { key: string; name: string | null; lines: PoLine[] };

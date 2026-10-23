@@ -4,12 +4,12 @@
  */
 
 var CSV_SOURCES = [
-  { prefix: 'weekly_sales', tab: SHEETS.SALES, required: true, textCols: [2], numCols: [3] },
-  { prefix: 'sku_master', tab: SHEETS.SKU, required: true, textCols: [], numCols: [5] },
-  { prefix: 'current_inventory', tab: SHEETS.INV, required: true, textCols: [4], numCols: [3] },
-  { prefix: 'calendar', tab: SHEETS.CAL, required: true, textCols: [3], numCols: [] },
-  { prefix: 'distributor_master', tab: SHEETS.DIST, required: false, textCols: [], numCols: [] },
-  { prefix: 'open_pos', tab: SHEETS.PO, required: false, textCols: [3], numCols: [2] }
+  { prefix: 'weekly_sales', tab: SHEETS.SALES, required: true, textCols: [2], numNames: ['Units_Sold'] },
+  { prefix: 'sku_master', tab: SHEETS.SKU, required: true, textCols: [], numNames: ['Standard_Reorder_Qty', 'Unit_Cost', 'Tax_Pct'] },
+  { prefix: 'current_inventory', tab: SHEETS.INV, required: true, textCols: [4], numNames: ['Units_On_Hand'] },
+  { prefix: 'calendar', tab: SHEETS.CAL, required: true, textCols: [3], numNames: [] },
+  { prefix: 'distributor_master', tab: SHEETS.DIST, required: false, textCols: [], numNames: [] },
+  { prefix: 'open_pos', tab: SHEETS.PO, required: false, textCols: [3], numNames: ['Qty_On_Order'] }
 ];
 
 function findLatestCsv_(folder, prefix) {
@@ -52,7 +52,7 @@ function ingest_(rules) {
     var rows = table.slice(1).map(function (r) {
       return r.map(function (v, i) {
         v = String(v).trim();
-        return src.numCols.indexOf(i + 1) >= 0 && v !== '' && isFinite(Number(v)) ? Number(v) : v;
+        return src.numNames.indexOf(header[i]) >= 0 && v !== '' && isFinite(Number(v)) ? Number(v) : v;
       });
     });
     loaded[src.prefix] = { header: header, rows: rows };
