@@ -28,6 +28,7 @@ export type PlanningData = {
   completeness: number; // percent of SKU x week sales cells present over the baseline window
   enough: boolean; // completeness is at or above the rule's minimum
   windowWeeks: number;
+  manual: Record<string, { on_hand: number | null; weekly_demand: number | null; note: string | null }>; // typed in by a person
 };
 
 /** Everything the engine needs, or a plain-English reason why it cannot run yet. */
@@ -64,7 +65,7 @@ export async function loadPlanningData(): Promise<{ ok: true; data: PlanningData
     history.set(id, (history.get(id) ?? 0) + 1);
     if (!first.has(id) || w < first.get(id)!) first.set(id, w);
   }
-  const isNew = (id: string) => (history.get(id) ?? 0) < rules.MIN_HISTORY_WEEKS && (first.get(id) ?? "") >= window[0];
+  const isNew = (id: string) => (history.get(id) ?? 0) < rules.MIN_HISTORY_WEEKS && (!first.has(id) || first.get(id)! >= window[0]);
   const judged = new Set(skus.filter((k) => !isNew(k.sku_id)).map((k) => k.sku_id));
   const present = salesRows.filter((r) => inWindow.has(String(r.week)) && judged.has(String(r.sku_id))).length;
   const ratio = judged.size ? present / (judged.size * window.length) : 0;
@@ -81,6 +82,25 @@ export async function loadPlanningData(): Promise<{ ok: true; data: PlanningData
     if (String(r.as_of) > asOf) asOf = String(r.as_of);
   }
 
+  // Hand-entered values fill in only where real data is missing; real stock or 12+ weeks of sales always win.
+  const manualRows = await sql`select sku_id, on_hand, weekly_demand, note from sku_manual`;
+  const manual: PlanningData["manual"] = {};
+  const manualSkus: string[] = [];
+  let salesOut = salesRows.map((r) => ({ sku: String(r.sku_id), week: String(r.week), units: Number(r.units) }));
+  for (const m of manualRows) {
+    const id = String(m.sku_id);
+    if (!skus.some((k) => k.sku_id === id)) continue;
+    manual[id] = { on_hand: m.on_hand === null ? null : Number(m.on_hand), weekly_demand: m.weekly_demand === null ? null : Number(m.weekly_demand), note: m.note ?? null };
+    let used = false;
+    if (manual[id].on_hand !== null && !Object.prototype.hasOwnProperty.call(inventory, id)) { inventory[id] = manual[id].on_hand!; used = true; }
+    const w = manual[id].weekly_demand;
+    if (w !== null && (history.get(id) ?? 0) < rules.MIN_HISTORY_WEEKS && weeks.length >= rules.MIN_HISTORY_WEEKS) {
+      salesOut = salesOut.filter((r) => r.sku !== id).concat(weeks.slice(-rules.MIN_HISTORY_WEEKS).map((week) => ({ sku: id, week, units: w })));
+      used = true;
+    }
+    if (used) manualSkus.push(id);
+  }
+
   const calRows = await sql`select year_month, is_festival from calendar_months`;
   const poRows = await sql`select created_at, received_at, lines from purchase_orders where received_at is null`;
   const openDays = Number(process.env.OPEN_PO_DAYS) || 21;
@@ -94,23 +114,23 @@ export async function loadPlanningData(): Promise<{ ok: true; data: PlanningData
     ok: true,
     data: {
       input: {
-        sales: salesRows.map((r) => ({ sku: String(r.sku_id), week: String(r.week), units: Number(r.units) })),
-        skus, inventory, openPos,
+        sales: salesOut,
+        skus, inventory, openPos, manualSkus,
         calendar: calRows.map((c) => ({ year_month: String(c.year_month), is_festival: Boolean(c.is_festival) })),
         rules, asOf, today: istParts().date,
       },
-      distName, completeness, enough: ratio >= rules.COMPLETENESS_MIN, windowWeeks: window.length,
+      distName, completeness, enough: ratio >= rules.COMPLETENESS_MIN, windowWeeks: window.length, manual,
     },
   };
 }
 
 /** Every SKU with its stock position, most urgent first. For the Stock page. */
-export async function loadStock(): Promise<{ ok: true; rows: StockRow[]; asOf: string; festival: boolean; completeness: number; rules: Rules; distName: Map<string, string | null> } | { ok: false; message: string }> {
+export async function loadStock(): Promise<{ ok: true; rows: StockRow[]; asOf: string; festival: boolean; completeness: number; rules: Rules; distName: Map<string, string | null>; manual: PlanningData["manual"] } | { ok: false; message: string }> {
   const r = await loadPlanningData();
   if (!r.ok) return r;
-  const { input, completeness, distName } = r.data;
+  const { input, completeness, distName, manual } = r.data;
   const festival = runEngine({ ...input, skus: [] }).festival;
-  return { ok: true, rows: stockRows(input), asOf: input.asOf, festival, completeness, rules: input.rules, distName };
+  return { ok: true, rows: stockRows(input), asOf: input.asOf, festival, completeness, rules: input.rules, distName, manual };
 }
 
 async function abort(runId: string, by: string, message: string, extra: { completeness?: number | null; asOf?: string | null } = {}): Promise<PlanningResult> {

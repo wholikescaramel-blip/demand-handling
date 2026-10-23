@@ -62,3 +62,33 @@ export async function markReceived(formData: FormData) {
   redirect("/orders");
 }
 
+
+/** A person fills in what the rules cannot know about a SKU. It is saved, then planning runs at once so it shows up everywhere. */
+export async function saveManualInfo(formData: FormData) {
+  const sku = String(formData.get("sku") ?? "");
+  const from = String(formData.get("from") ?? "review") === "stock" ? "/stock" : "/review";
+  const go = (p: Record<string, string>) => redirect(`${from}?${new URLSearchParams(p).toString()}`);
+  const reviewer = await currentReviewer();
+  if (!reviewer) go({ error: NO_REVIEWER, sku });
+  if (!dbConfigured()) go({ error: "The database is not connected.", sku });
+
+  const onRaw = String(formData.get("on_hand") ?? "").trim();
+  const demandRaw = String(formData.get("weekly_demand") ?? "").trim();
+  if (onRaw !== "" && !/^\d+$/.test(onRaw)) go({ error: "Stock in hand must be a whole number.", sku });
+  if (demandRaw !== "" && !(/^\d+(\.\d+)?$/.test(demandRaw) && Number(demandRaw) > 0)) go({ error: "Weekly demand must be a number above zero.", sku });
+  if (onRaw === "" && demandRaw === "") go({ error: "Enter the stock in hand, the weekly demand, or both.", sku });
+  const note = String(formData.get("note") ?? "").trim().slice(0, 300) || null;
+
+  const sql = getSql();
+  const known = await sql`select 1 from skus where sku_id = ${sku} and active`;
+  if (!known.length) go({ error: `${sku} is not an active SKU.`, sku });
+  await sql`
+    insert into sku_manual (sku_id, on_hand, weekly_demand, note, entered_by, updated_at)
+    values (${sku}, ${onRaw === "" ? null : Number(onRaw)}, ${demandRaw === "" ? null : Number(demandRaw)}, ${note}, ${reviewer}, now())
+    on conflict (sku_id) do update set on_hand = excluded.on_hand, weekly_demand = excluded.weekly_demand, note = excluded.note,
+      entered_by = excluded.entered_by, updated_at = now()`;
+
+  const r = await runPlanning(reviewer!);
+  refresh();
+  go(r.ok ? { ok: `${sku} saved. ${r.message}` } : { error: `${sku} saved, but planning could not run: ${r.message}` });
+}

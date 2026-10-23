@@ -53,6 +53,16 @@ create table if not exists rules (
   value text
 );
 
+-- What a person typed in for a SKU the rules cannot judge yet (new, or no sales/stock data). Used only while real data is missing.
+create table if not exists sku_manual (
+  sku_id        text primary key,
+  on_hand       integer,
+  weekly_demand double precision,
+  note          text,
+  entered_by    text,
+  updated_at    timestamptz not null default now()
+);
+
 create table if not exists data_files (
   id          serial primary key,
   kind        text not null,

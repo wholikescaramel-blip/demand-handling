@@ -1,10 +1,11 @@
 import { getSnapshot } from "@/lib/data";
 import { ActionPill, DecisionPill, PoPill, fmtDateTime } from "@/components/ui";
+import { ManualInfoForm } from "@/components/ManualInfoForm";
 import { DecisionForm } from "@/components/DecisionForm";
 import { PoActions } from "@/components/PoActions";
 import { NotConnected } from "@/components/NotConnected";
 import { loadStock } from "@/lib/planning";
-import { createPoForLine, decide, runPlanningNow } from "./actions";
+import { createPoForLine, decide } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +30,13 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   if (!snap) return <NotConnected />;
   const run = snap.latestRun;
   const live = run?.mode === "LIVE";
-  const pending = live ? snap.recs.filter((r) => !r.decision) : [];
+  const pending0 = live ? snap.recs.filter((r) => !r.decision) : [];
   const decided = live ? snap.recs.filter((r) => r.decision) : [];
-  // SKUs the rules cannot judge (new, or no stock/sales data) that are not in the latest run yet, e.g. after stock was edited in Neon
-  const inRun = new Set(snap.recs.map((r) => r.sku));
+  // SKUs the rules cannot judge (new, or no stock/sales data): found live, no planning run needed
   const stock = await loadStock();
-  const waitingForRun = stock.ok ? stock.rows.filter((r) => r.action === "MANUAL_REVIEW" && (r.status === "NEW" || r.status === "NO_DATA") && !inRun.has(r.sku)) : [];
+  const needInfo = stock.ok ? stock.rows.filter((r) => r.status === "NEW" || r.status === "NO_DATA") : [];
+  const needSet = new Set(needInfo.map((r) => r.sku));
+  const pending = pending0.filter((r) => !(r.action === "MANUAL_REVIEW" && needSet.has(r.sku)));
   const poBy = new Map(snap.pos.map((p) => [p.po_number, p]));
 
   return (
@@ -51,17 +53,28 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       {error ? <div className="banner bad" role="alert">{error}</div> : null}
       {ok ? <div className="banner good" role="status">{ok}</div> : null}
 
-      {waitingForRun.length ? (
-        <section className="card" style={{ borderLeft: "4px solid var(--manual)" }}>
-          <div className="head">
-            <div>
-              <h2>Needs manual info ({waitingForRun.length})</h2>
-              <p className="small dim" style={{ margin: 0 }}>
-                The rules have no data to judge {waitingForRun.length === 1 ? "this SKU" : "these SKUs"}: {waitingForRun.map((r) => `${r.sku} (${r.status === "NEW" ? "new, short history" : "no stock or sales data"})`).join(", ")}.
-                Run planning and {waitingForRun.length === 1 ? "it appears" : "they appear"} below as a manual card where a person enters the quantity and the reason.
-              </p>
-            </div>
-            <form action={runPlanningNow}><button className="btn primary" type="submit">Run planning now</button></form>
+      {needInfo.length && stock.ok ? (
+        <section style={{ marginBottom: 18 }}>
+          <h2 className="sectiontitle">Needs manual info ({needInfo.length})</h2>
+          <p className="small dim" style={{ marginTop: -4 }}>
+            The rules have too little data to judge these. Enter what you know; saving runs planning, and the SKU then gets a normal recommendation here and on the Stock tab.
+          </p>
+          <div className="reviewlist">
+            {needInfo.map((r) => (
+              <article key={r.sku} className={`reviewitem${errSku === r.sku ? " haserr" : ""}`}>
+                <div className="reviewhead">
+                  <div>
+                    <strong>{r.sku}</strong> <span className="dim">{r.name}</span>
+                    <div className="small dim">Vendor: {(r.distributor && stock.distName.get(r.sku)) || r.distributor || "unknown"}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <span className="pill manual">Manual</span>
+                    <div className="small dim">{r.status === "NEW" ? "New SKU, short sales history" : "No stock or sales data"}{r.onHand !== null ? ` · ${r.onHand} in hand` : ""}</div>
+                  </div>
+                </div>
+                <ManualInfoForm sku={r.sku} from="review" onHand={stock.manual[r.sku]?.on_hand ?? r.onHand} weeklyDemand={stock.manual[r.sku]?.weekly_demand ?? null} note={stock.manual[r.sku]?.note ?? null} needStock={r.onHand === null} />
+              </article>
+            ))}
           </div>
         </section>
       ) : null}

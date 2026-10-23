@@ -174,6 +174,28 @@ test("a brand-new SKU does not block the run: it comes out as a manual card", as
   await sql`delete from inventory_snapshots where sku_id = 'NEW001'`;
 });
 
+test("a SKU with no sales at all does not block the run; hand-entered stock and demand turn it into a normal recommendation", async () => {
+  await sql`insert into skus (sku_id, name, perishability, std_reorder_qty, distributor_id) values ('NEW002', 'No history', 'Low', 200, 'DIST001')`;
+  await new Promise((r) => setTimeout(r, 1100));
+  let res = await runPlanning("tester");
+  assert.equal(res.ok, true, res.message);
+  let snap = (await getSnapshot())!;
+  const first = snap.recs.find((r) => r.sku === "NEW002")!;
+  assert.equal(first.action, "MANUAL_REVIEW");
+
+  await sql`insert into sku_manual (sku_id, on_hand, weekly_demand, entered_by) values ('NEW002', 30, 20, 'tester')`;
+  await new Promise((r) => setTimeout(r, 1100));
+  res = await runPlanning("tester");
+  assert.equal(res.ok, true, res.message);
+  snap = (await getSnapshot())!;
+  const rec = snap.recs.find((r) => r.sku === "NEW002")!;
+  assert.equal(rec.action, "REORDER"); // 30 on hand / 20 a week = 1.5 weeks, under the 6-week floor
+  assert.equal(rec.on_hand, 30);
+  assert.match(rec.data_notes ?? "", /MANUAL_INPUT/);
+  await sql`delete from skus where sku_id = 'NEW002'`;
+  await sql`delete from sku_manual where sku_id = 'NEW002'`;
+});
+
 test("a run with too little sales data stops and says why, producing nothing", async () => {
   await sql`delete from sales_weekly where sku_id in ('SKU001','SKU002','SKU003','SKU004','SKU005','SKU006','SKU007','SKU008') and week >= '2026-W35'`; // a gap in the latest weeks for 8 SKUs
   await new Promise((r) => setTimeout(r, 1100));

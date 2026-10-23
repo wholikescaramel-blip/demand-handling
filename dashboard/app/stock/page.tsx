@@ -1,6 +1,7 @@
 import { dbConfigured } from "@/lib/db";
 import { loadStock } from "@/lib/planning";
 import type { StockStatus } from "@/lib/engine";
+import { ManualInfoForm } from "@/components/ManualInfoForm";
 import { NotConnected } from "@/components/NotConnected";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,8 @@ function Gauge({ cover, floor, ceiling }: { cover: number | null; floor: number;
   );
 }
 
-export default async function StockPage() {
+export default async function StockPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string; sku?: string }> }) {
+  const { error, ok } = await searchParams;
   if (!dbConfigured()) return <NotConnected />;
   const s = await loadStock();
   if (!s.ok) {
@@ -43,6 +45,8 @@ export default async function StockPage() {
   return (
     <>
       <h1>Stock</h1>
+      {error ? <div className="banner bad" role="alert">{error}</div> : null}
+      {ok ? <div className="banner good" role="status">{ok}</div> : null}
       <p className="sub">
         Every SKU, most urgent first. Stock as of {s.asOf}{s.festival ? " · festival month, demand counted +" + Math.round(s.rules.FESTIVAL_UPLIFT * 100) + "%" : ""} · {urgent} need attention.
         Target is {s.rules.STOCKOUT_WEEKS} to {s.rules.OVERSTOCK_WEEKS} weeks of cover ({s.rules.PERISHABLE_MIN_WEEKS} to {s.rules.PERISHABLE_MAX_WEEKS} for perishables).
@@ -65,6 +69,12 @@ export default async function StockPage() {
                     <td>
                       <strong>{r.sku}</strong> <span className="dim">{r.name}</span>
                       <div className="small dim">{r.distributor ? (s.distName.get(r.distributor) ?? r.distributor) : "no vendor"}{r.perishable ? " · perishable" : ""}</div>
+                      {r.manual || r.status === "NEW" || r.status === "NO_DATA" ? (
+                        <details style={{ marginTop: 6 }}>
+                          <summary className="small">{r.manual ? "Entered by hand · edit" : "Enter info by hand"}</summary>
+                          <ManualInfoForm sku={r.sku} from="stock" onHand={s.manual[r.sku]?.on_hand ?? r.onHand} weeklyDemand={s.manual[r.sku]?.weekly_demand ?? null} note={s.manual[r.sku]?.note ?? null} needStock={r.onHand === null} />
+                        </details>
+                      ) : null}
                     </td>
                     <td className="num">{r.onHand ?? "n/a"}</td>
                     <td className="num">{r.openPo || "—"}</td>
@@ -74,7 +84,7 @@ export default async function StockPage() {
                       <Gauge cover={r.coverWeeks} floor={r.floorWeeks} ceiling={r.ceilingWeeks} />
                       <div className="small dim">{r.floorWeeks} to {r.ceilingWeeks} wks</div>
                     </td>
-                    <td><span className={`pill ${st.cls}`}>{st.label}</span></td>
+                    <td><span className={`pill ${st.cls}`}>{st.label}</span>{r.manual ? <div className="small dim">manual input</div> : null}</td>
                     <td className="small">
                       {r.unitsToFloor > 0 ? `${r.unitsToFloor} short of ${r.floorWeeks} wks` : r.unitsOverCeiling > 0 ? `${r.unitsOverCeiling} over ${r.ceilingWeeks} wks` : "—"}
                     </td>

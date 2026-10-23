@@ -48,6 +48,7 @@ export type EngineInput = {
   rules: Rules;
   asOf: string; // yyyy-mm-dd, the stock-data date
   today?: string; // yyyy-mm-dd, for the staleness note
+  manualSkus?: string[]; // SKUs whose stock or weekly demand was typed in by a person
 };
 
 export type Rec = {
@@ -197,12 +198,13 @@ export function runEngine(input: EngineInput): EngineResult {
   if (input.today && daysBetween(input.asOf, input.today) > rules.MAX_DATA_AGE_DAYS) {
     dq.push(`STALE_DATA (${daysBetween(input.asOf, input.today)} days old)`);
   }
+  const manual = new Set(input.manualSkus ?? []);
   const recs: Rec[] = [];
   const anomalies: { sku: string; note: string }[] = [];
   let healthy = 0;
   for (const sku of input.skus) {
     const has = Object.prototype.hasOwnProperty.call(input.inventory, sku.sku_id);
-    const rec = evaluateSku(sku, idx[sku.sku_id] ?? [], has ? Number(input.inventory[sku.sku_id]) : null, Number(input.openPos[sku.sku_id] ?? 0), festival, rules, dq);
+    const rec = evaluateSku(sku, idx[sku.sku_id] ?? [], has ? Number(input.inventory[sku.sku_id]) : null, Number(input.openPos[sku.sku_id] ?? 0), festival, rules, manual.has(sku.sku_id) ? [...dq, "MANUAL_INPUT (stock or weekly demand entered by hand)"] : dq);
     if (!rec) {
       healthy++;
       continue;
@@ -230,6 +232,7 @@ export type StockRow = {
   ceilingWeeks: number; // target band: highest acceptable weeks of cover
   trendPct: number | null;
   status: StockStatus;
+  manual: boolean; // stock or weekly demand was entered by hand
   priority: number; // 0 when nothing needs doing
   action: Action | null; // what the rules recommend, if anything
   recQty: number | null;
@@ -249,7 +252,7 @@ export function stockRows(input: EngineInput): StockRow[] {
     const ceiling = perishable ? rules.PERISHABLE_MAX_WEEKS : rules.OVERSTOCK_WEEKS;
     const onHand = Object.prototype.hasOwnProperty.call(input.inventory, sku.sku_id) ? Number(input.inventory[sku.sku_id]) : null;
     const openPo = Number(input.openPos[sku.sku_id] ?? 0);
-    const base = { sku: sku.sku_id, name: sku.name, perishable, distributor: sku.distributor_id, onHand, openPo, floorWeeks: floor, ceilingWeeks: ceiling, unitsToFloor: 0, unitsOverCeiling: 0 };
+    const base = { sku: sku.sku_id, name: sku.name, perishable, manual: (input.manualSkus ?? []).includes(sku.sku_id), distributor: sku.distributor_id, onHand, openPo, floorWeeks: floor, ceilingWeeks: ceiling, unitsToFloor: 0, unitsOverCeiling: 0 };
     const none = (status: StockStatus): StockRow => ({ ...base, weeklyDemand: null, coverWeeks: null, trendPct: null, status, priority: 50, action: ACTIONS.MANUAL, recQty: null });
 
     if (units.length < rules.MIN_HISTORY_WEEKS) return none("NEW");
