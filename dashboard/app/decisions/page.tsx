@@ -1,15 +1,16 @@
 import { getSnapshot } from "@/lib/data";
 import { decisionStats } from "@/lib/metrics";
-import { ActionPill, DecisionPill, DemoBanner, fmtDateTime, pct } from "@/components/ui";
+import { ActionPill, DecisionPill, fmtDateTime, pct } from "@/components/ui";
+import { NotConnected } from "@/components/NotConnected";
 
 export const dynamic = "force-dynamic";
 
 export default async function DecisionsPage() {
   const snap = await getSnapshot();
+  if (!snap) return <NotConnected />;
   const stats = decisionStats(snap.decisions);
   return (
     <>
-      <DemoBanner demo={snap.demo} />
       <h1>Review log</h1>
       <p className="sub">
         Every decision Raghav made, newest first. {stats.decided} decided · {pct(stats.changedRate)} changed or rejected ·{" "}
@@ -37,7 +38,7 @@ export default async function DecisionsPage() {
                   <td className="small">{d.reviewer}</td>
                 </tr>
               ))}
-              {!snap.decisions.length ? <tr><td colSpan={8} className="dim">No decisions yet. They sync when Raghav clicks Finalise decisions in the Sheet.</td></tr> : null}
+              {!snap.decisions.length ? <tr><td colSpan={8} className="dim">No decisions yet. They appear here as soon as Raghav presses Approve or Reject on the Review page.</td></tr> : null}
             </tbody>
           </table>
         </div>

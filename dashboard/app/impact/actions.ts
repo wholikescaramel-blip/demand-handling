@@ -1,6 +1,6 @@
 "use server";
 
-import { neon } from "@neondatabase/serverless";
+import { dbConfigured, getSql } from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -17,8 +17,8 @@ function lakhToRupees(raw: FormDataEntryValue | null): number | null {
 }
 
 export async function saveLossEntry(formData: FormData) {
-  if (!process.env.DATABASE_URL) redirect(back({ error: "Demo mode: connect a database to save entries." }));
-  const sql = neon(process.env.DATABASE_URL!);
+  if (!dbConfigured()) redirect(back({ error: "The database is not connected." }));
+  const sql = getSql();
 
   const day = String(formData.get("week") ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) redirect(back({ error: "Pick a date in the week you are reporting." }));
@@ -49,8 +49,8 @@ export async function saveLossEntry(formData: FormData) {
 }
 
 export async function saveImpactSettings(formData: FormData) {
-  if (!process.env.DATABASE_URL) redirect(back({ error: "Demo mode: connect a database to save settings." }));
-  const sql = neon(process.env.DATABASE_URL!);
+  if (!dbConfigured()) redirect(back({ error: "The database is not connected." }));
+  const sql = getSql();
 
   const goLive = String(formData.get("go_live") ?? "").trim();
   if (goLive && !/^\d{4}-\d{2}-\d{2}$/.test(goLive)) redirect(back({ error: "Go-live must be a date." }));

@@ -1,6 +1,7 @@
 import { getSnapshot } from "@/lib/data";
 import { evaluateImpact, lakh, mondayOf, total } from "@/lib/impact";
-import { DemoBanner, Kpi, fmtDateTime } from "@/components/ui";
+import { Kpi, fmtDateTime } from "@/components/ui";
+import { NotConnected } from "@/components/NotConnected";
 import { LossChart, SavedChart } from "@/components/ImpactCharts";
 import { saveImpactSettings, saveLossEntry } from "./actions";
 
@@ -12,16 +13,15 @@ const pctText = (x: number | null) => (x === null ? "n/a" : `${Math.round(x * 10
 export default async function ImpactPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string }> }) {
   const { error, ok } = await searchParams;
   const snap = await getSnapshot();
+  if (!snap) return <NotConnected />;
   const { entries, settings } = snap.impact;
   const ev = evaluateImpact(entries, settings, today());
-  const locked = snap.demo;
   const tone = ev.status === "on_target" ? "var(--ok-bg)" : ev.status === "improving" ? "var(--warn-bg)" : ev.status === "revert" ? "var(--bad-bg)" : "var(--na-bg)";
   const toneBorder = ev.status === "on_target" ? "var(--healthy)" : ev.status === "improving" ? "var(--warn)" : ev.status === "revert" ? "var(--bad)" : "var(--border)";
   const lakhIn = (rupees: number | null) => (rupees === null ? "" : String(rupees / 100000));
 
   return (
     <>
-      <DemoBanner demo={snap.demo} />
       <h1>Impact</h1>
       <p className="sub">
         Are planning losses (stockouts plus overstock write-offs) lower than before the system? Add the weekly numbers and the graphs
@@ -83,7 +83,7 @@ export default async function ImpactPage({ searchParams }: { searchParams: Promi
             <input name="note" type="text" maxLength={300} placeholder="e.g. Diwali week, two distributors short" style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)" }} />
           </label>
           <div style={{ marginTop: 12 }}>
-            <button className="btn primary" type="submit" disabled={locked}>Save week</button>
+            <button className="btn primary" type="submit">Save week</button>
           </div>
         </form>
 
@@ -134,7 +134,7 @@ export default async function ImpactPage({ searchParams }: { searchParams: Promi
             </label>
           </div>
           <div style={{ marginTop: 12 }}>
-            <button className="btn" type="submit" disabled={locked}>Save settings</button>
+            <button className="btn" type="submit">Save settings</button>
           </div>
         </form>
       </details>

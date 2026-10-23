@@ -1,57 +1,55 @@
 import { getSnapshot } from "@/lib/data";
-import {
-  ADOPTION_KILL, decisionStats, estimateCostInr, killChecks, runSeries, weeklyChangeRate,
-} from "@/lib/metrics";
-import { ActionPill, DecisionPill, DemoBanner, Kpi, KillChecks, fmtDateTime, pct } from "@/components/ui";
-import { ChangeRateChart, RunsChart } from "@/components/Charts";
+import { ADOPTION_KILL, decisionStats, killChecks, runSeries, weeklyChangeRate } from "@/lib/metrics";
 import { evaluateImpact } from "@/lib/impact";
+import { ActionPill, DecisionPill, Kpi, KillChecks, fmtDateTime, pct } from "@/components/ui";
+import { ChangeRateChart, RunsChart } from "@/components/Charts";
+import { NotConnected } from "@/components/NotConnected";
+import { runPlanningNow } from "./review/actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function Overview() {
   const snap = await getSnapshot();
+  if (!snap) return <NotConnected />;
   const run = snap.latestRun;
   const stats = decisionStats(snap.decisions);
   const weekly = weeklyChangeRate(snap.decisions);
   const impact = evaluateImpact(snap.impact.entries, snap.impact.settings, new Date().toISOString().slice(0, 10));
   const checks = killChecks(run, stats, weekly, impact);
   const awaiting = run?.mode === "LIVE" ? snap.recs.filter((r) => !r.decision).length : null;
-  const perMillion = process.env.GEMINI_COST_PER_MILLION_TOKENS_INR ? Number(process.env.GEMINI_COST_PER_MILLION_TOKENS_INR) : null;
-  const tokens = snap.runs.reduce((s, r) => s + r.gemini_tokens, 0);
-  const cost = estimateCostInr(tokens, perMillion);
 
   return (
     <>
-      <DemoBanner demo={snap.demo} />
-      <h1>Overview</h1>
-      <p className="sub">
-        {run ? (
-          <>
-            Latest run {fmtDateTime(run.run_at)} · stock as of {run.as_of} ·{" "}
-            <span className={`pill ${run.mode === "LIVE" ? "ok" : "neutral"}`}>{run.mode === "LIVE" ? "Live" : "Shadow mode"}</span>
-            {run.festival ? <> · <span className="pill warn">Festival month</span></> : null}
-          </>
-        ) : (
-          "No runs synced yet. Run the pipeline in the Sheet."
-        )}
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1>Overview</h1>
+          <p className="sub" style={{ marginBottom: 12 }}>
+            {run ? (
+              <>
+                Latest run {fmtDateTime(run.run_at)} · stock as of {run.as_of} ·{" "}
+                <span className={`pill ${run.mode === "LIVE" ? "ok" : "neutral"}`}>{run.mode === "LIVE" ? "Live" : "Shadow mode"}</span>
+                {run.festival ? <> · <span className="pill warn">Festival month</span></> : null}
+              </>
+            ) : (
+              "No planning run yet. Add your data on the Data page, then press Run planning."
+            )}
+          </p>
+        </div>
+        <form action={runPlanningNow}><button className="btn primary" type="submit">Run planning now</button></form>
+      </div>
 
       <section className="grid kpis" aria-label="Key numbers">
         <Kpi label="SKUs flagged" value={run ? `${run.flagged} of ${run.skus}` : "n/a"} note={run ? `${run.n_reorder} reorder · ${run.n_pause} pause · ${run.n_manual} manual` : undefined} />
         <Kpi label="Awaiting Raghav" value={awaiting === null ? "n/a" : <a href="/review" style={{ color: "inherit" }}>{awaiting}</a>} note={awaiting === null ? "Shadow mode: nothing sent to review" : "decisions due within 24h"} />
         <Kpi label="Changed or rejected" value={pct(stats.changedRate)} note={`Kill line ${pct(ADOPTION_KILL)} · ${stats.decided} decided`} />
         <Kpi label="Avg time to decide" value={stats.avgHours === null ? "n/a" : `${stats.avgHours.toFixed(1)} h`} note={stats.slaRate === null ? undefined : `${pct(stats.slaRate)} within 24h`} />
-        <Kpi label="Gemini usage" value={`${(tokens / 1000).toFixed(1)}k tokens`} note={cost === null ? "Free tier: Rs 0" : `about Rs ${cost.toFixed(2)}`} />
       </section>
 
       {run?.summary ? (
-        <section className="card" style={{ marginBottom: 14 }}>
+        <section className="card" style={{ marginBottom: 18 }}>
           <h2>Run summary</h2>
           <p style={{ margin: 0 }}>{run.summary}</p>
-          <p className="small dim" style={{ margin: "8px 0 0" }}>
-            Reasons written by Gemini: {run.gemini_reasons ?? "n/a"}. Gemini only words numbers the rules engine computed.
-            {run.notes ? <> Notes: {run.notes}</> : null}
-          </p>
+          {run.notes ? <p className="small dim" style={{ margin: "8px 0 0" }}>{run.notes}</p> : null}
         </section>
       ) : null}
 
@@ -76,13 +74,13 @@ export default async function Overview() {
           <table>
             <tbody>
               <tr><td>Approved as recommended</td><td className="num">{stats.approve}</td></tr>
-              <tr><td>Overridden (quantity changed)</td><td className="num">{stats.override}</td></tr>
+              <tr><td>Approved with a changed quantity</td><td className="num">{stats.override}</td></tr>
               <tr><td>Rejected</td><td className="num">{stats.reject}</td></tr>
               <tr><td>Expired (not decided in time)</td><td className="num">{stats.expired}</td></tr>
             </tbody>
           </table>
           <p className="small dim" style={{ marginBottom: 0 }}>
-            Every override and reject carries a reason. Those reasons document the 15-20% of calls that used to live only in Raghav&apos;s head.
+            Every changed quantity and every rejection carries a reason. Those reasons document the 15-20% of calls that used to live only in Raghav&apos;s head.
           </p>
         </div>
       </section>
@@ -101,10 +99,7 @@ export default async function Overview() {
               {snap.recs.map((r) => (
                 <tr key={r.sku}>
                   <td className="num">{r.priority}</td>
-                  <td>
-                    <strong>{r.sku}</strong>
-                    <div className="small dim">{r.name}{r.perishable ? " · perishable" : ""}</div>
-                  </td>
+                  <td><strong>{r.sku}</strong><div className="small dim">{r.name}{r.perishable ? " · perishable" : ""}</div></td>
                   <td><ActionPill action={r.action} /></td>
                   <td className="num">{r.rec_qty ?? "—"}</td>
                   <td className="num">{r.on_hand}{r.open_po ? <span className="dim"> +{r.open_po} on order</span> : null}</td>
@@ -112,11 +107,11 @@ export default async function Overview() {
                   <td className="num">{r.trend_pct === null ? "—" : `${r.trend_pct > 0 ? "+" : ""}${r.trend_pct}%`}</td>
                   <td className="reason">
                     {r.reason}
-                    <div className="small dim">{r.reason_source === "gemini" ? "Written by Gemini" : "Template text"}{r.data_notes ? ` · ${r.data_notes}` : ""}</div>
+                    <div className="small dim">{r.reason_source === "gemini" ? "Worded by Gemini" : "Standard text"}{r.data_notes ? ` · ${r.data_notes}` : ""}</div>
                   </td>
                   <td>
                     <DecisionPill decision={run?.mode === "LIVE" ? r.decision : null} />
-                    {r.decision === "Override" && r.final_qty !== null ? <div className="small dim">Final {r.final_qty}</div> : null}
+                    {r.final_qty !== null && r.decision && r.decision !== "Reject" ? <div className="small dim">Ordered {r.final_qty}</div> : null}
                     {r.change_reason ? <div className="small dim">{r.change_reason}</div> : null}
                   </td>
                 </tr>

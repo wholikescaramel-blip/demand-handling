@@ -1,12 +1,10 @@
 import { getPo } from "@/lib/data";
 import { buildPoPdf, poOptionsFromEnv } from "@/lib/pdf";
-import { isAuthed } from "@/lib/secret";
 
 export const dynamic = "force-dynamic";
 
-/** The purchase order as a PDF. `?download=1` makes the browser save it instead of showing it. */
+/** The purchase order as a PDF (the password gate in proxy.ts protects it). `?download=1` saves it instead of showing it. */
 export async function GET(req: Request, { params }: { params: Promise<{ number: string }> }) {
-  if (!(await isAuthed(req))) return new Response("Unauthorized", { status: 401 });
   const { number } = await params;
   const po = await getPo(decodeURIComponent(number));
   if (!po) return new Response("No such purchase order", { status: 404 });

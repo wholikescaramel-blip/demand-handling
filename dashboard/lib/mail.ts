@@ -1,39 +1,39 @@
 /**
- * Email goes out through an Apps Script web app (your Gmail), so there is no extra email service to sign up for.
- * The dashboard posts the PDF to MAIL_WEBHOOK_URL together with the shared SYNC_SECRET; the script checks the secret
- * and sends the message. See apps-script/Mail.js.
+ * Email goes out over SMTP, so any mailbox works. The simplest free setup is a Gmail account with an "app password"
+ * (Google account > Security > 2-Step Verification > App passwords): set SMTP_USER to the Gmail address and SMTP_PASS to
+ * that app password. Without them the Send button is disabled and Download still works.
  */
-export const mailConfigured = () => Boolean(process.env.MAIL_WEBHOOK_URL && process.env.SYNC_SECRET);
+import nodemailer from "nodemailer";
+
+export const mailConfigured = () => Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
 
 export const validEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.trim());
 
-export async function sendMailViaWebApp(args: {
+export async function sendMail(args: {
   to: string;
   subject: string;
   body: string;
   filename: string;
   pdf: Uint8Array;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!mailConfigured()) return { ok: false, error: "Email is not set up. Add MAIL_WEBHOOK_URL in the Vercel settings." };
+  if (!mailConfigured()) return { ok: false, error: "Email is not set up. Add SMTP_USER and SMTP_PASS in the Vercel settings." };
   try {
-    const res = await fetch(process.env.MAIL_WEBHOOK_URL!, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, // text/plain avoids a CORS-style preflight on Apps Script
-      body: JSON.stringify({
-        secret: process.env.SYNC_SECRET, to: args.to, subject: args.subject, body: args.body, filename: args.filename,
-        pdf_base64: Buffer.from(args.pdf).toString("base64"),
-      }),
-      redirect: "follow",
+    const port = Number(process.env.SMTP_PORT) || 465;
+    const transport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port,
+      secure: port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
-    const text = await res.text();
-    let json: { ok?: boolean; error?: string } = {};
-    try {
-      json = JSON.parse(text);
-    } catch {
-      return { ok: false, error: `The email script did not answer properly (HTTP ${res.status}). Check that the web app is deployed to "Anyone".` };
-    }
-    return json.ok ? { ok: true } : { ok: false, error: json.error ?? "The email script refused the request." };
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: args.to,
+      subject: args.subject,
+      text: args.body,
+      attachments: [{ filename: args.filename, content: Buffer.from(args.pdf), contentType: "application/pdf" }],
+    });
+    return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return { ok: false, error: `The email could not be sent: ${e instanceof Error ? e.message : String(e)}` };
   }
 }

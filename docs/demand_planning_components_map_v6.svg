@@ -1,0 +1,146 @@
+﻿<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2000 1420' width='2000' height='1420' font-family='Segoe UI, Arial, sans-serif'>
+<defs>
+<marker id='mg' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#475569'/></marker>
+<marker id='mo' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#ea580c'/></marker>
+<marker id='mgr' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#16a34a'/></marker>
+<marker id='mp' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='#7c3aed'/></marker>
+</defs>
+<rect width='2000' height='1420' fill='#ffffff'/>
+<text x='1000' y='46' text-anchor='middle' font-size='22' font-weight='700' fill='#111'>Demand Planning &#183; Freshroots &#8212; Components Map (v6)</text>
+<rect x='0' y='80' width='2000' height='55' fill='#14213d'/>
+<text x='95' y='113' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Actor</text>
+<text x='340' y='113' text-anchor='middle' font-size='16' font-weight='700' fill='#fff'>Trigger</text>
+<text x='642' y='113' text-anchor='middle' font-size='16' font-weight='700' fill='#fff'>Input</text>
+<text x='944' y='113' text-anchor='middle' font-size='16' font-weight='700' fill='#fff'>Context</text>
+<text x='1246' y='113' text-anchor='middle' font-size='16' font-weight='700' fill='#fff'>Processing</text>
+<text x='1547' y='113' text-anchor='middle' font-size='16' font-weight='700' fill='#fff'>AI</text>
+<text x='1849' y='113' text-anchor='middle' font-size='16' font-weight='700' fill='#fff'>Output</text>
+<rect x='190' y='135' width='1810' height='118' fill='#eceefe'/>
+<rect x='0' y='135' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='135' x2='2000' y2='135' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='190' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>SAP ERP</text>
+<text x='95' y='209' text-anchor='middle' font-size='11' fill='#a9b4cc'>IT team &#183; Source</text>
+<rect x='190' y='253' width='1810' height='118' fill='#e9f1fe'/>
+<rect x='0' y='253' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='253' x2='2000' y2='253' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='308' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Data page</text>
+<text x='95' y='327' text-anchor='middle' font-size='11' fill='#a9b4cc'>Dashboard &#183; Vercel</text>
+<rect x='190' y='371' width='1810' height='118' fill='#e7f7ec'/>
+<rect x='0' y='371' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='371' x2='2000' y2='371' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='426' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Neon database</text>
+<text x='95' y='445' text-anchor='middle' font-size='11' fill='#a9b4cc'>Single source of truth</text>
+<rect x='190' y='489' width='1810' height='118' fill='#fef7dc'/>
+<rect x='0' y='489' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='489' x2='2000' y2='489' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='544' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Rules Engine</text>
+<text x='95' y='563' text-anchor='middle' font-size='11' fill='#a9b4cc'>Dashboard &#183; server</text>
+<rect x='190' y='607' width='1810' height='118' fill='#fdf0f8'/>
+<rect x='0' y='607' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='607' x2='2000' y2='607' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='662' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Gemini API</text>
+<text x='95' y='681' text-anchor='middle' font-size='11' fill='#a9b4cc'>Explain</text>
+<rect x='190' y='725' width='1810' height='118' fill='#fff4df'/>
+<rect x='0' y='725' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='725' x2='2000' y2='725' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='780' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Review Dashboard</text>
+<text x='95' y='799' text-anchor='middle' font-size='11' fill='#a9b4cc'>Raghav &#183; human gate</text>
+<rect x='190' y='843' width='1810' height='118' fill='#f1f3f5'/>
+<rect x='0' y='843' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='843' x2='2000' y2='843' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='898' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>PO PDF</text>
+<text x='95' y='917' text-anchor='middle' font-size='11' fill='#a9b4cc'>Dashboard &#183; automatic</text>
+<rect x='190' y='961' width='1810' height='118' fill='#eef2f7'/>
+<rect x='0' y='961' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='961' x2='2000' y2='961' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='1016' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Download or email</text>
+<text x='95' y='1035' text-anchor='middle' font-size='11' fill='#a9b4cc'>Dashboard buttons</text>
+<rect x='190' y='1079' width='1810' height='118' fill='#f3eefe'/>
+<rect x='0' y='1079' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='1079' x2='2000' y2='1079' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='1134' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Overrides and Feedback</text>
+<text x='95' y='1153' text-anchor='middle' font-size='11' fill='#a9b4cc'>Raghav + Deepa</text>
+<rect x='190' y='1197' width='1810' height='118' fill='#fdeeee'/>
+<rect x='0' y='1197' width='190' height='118' fill='#14213d'/>
+<line x1='0' y1='1197' x2='2000' y2='1197' stroke='#fff' stroke-opacity='.6'/>
+<text x='95' y='1252' text-anchor='middle' font-size='15' font-weight='700' fill='#fff'>Impact tracker</text>
+<text x='95' y='1271' text-anchor='middle' font-size='11' fill='#a9b4cc'>Finance &#183; weekly entries</text>
+<rect x='191' y='725' width='1807' height='118' fill='none' stroke='#ff6a00' stroke-width='3' stroke-dasharray='14 8'/>
+<text x='200' y='743' font-size='11' font-weight='700' fill='#e25500'>HUMAN GATE</text>
+<path d='M340,240 V253 H642 V266' fill='none' stroke='#475569' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mg)'/>
+<circle cx='340' cy='240' r='4.5' fill='#22c55e'/>
+<path d='M642,358 V371 H944 V384' fill='none' stroke='#475569' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mg)'/>
+<circle cx='642' cy='358' r='4.5' fill='#22c55e'/>
+<path d='M1075,430 H1246 V502' fill='none' stroke='#475569' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mg)'/>
+<circle cx='1075' cy='430' r='4.5' fill='#22c55e'/>
+<path d='M1246,594 V607 H1547 V620' fill='none' stroke='#475569' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mg)'/>
+<circle cx='1246' cy='594' r='4.5' fill='#22c55e'/>
+<path d='M1547,712 V725 H1849 V738' fill='none' stroke='#ea580c' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mo)'/>
+<circle cx='1547' cy='712' r='4.5' fill='#22c55e'/>
+<path d='M1849,830 V856' fill='none' stroke='#16a34a' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mgr)'/>
+<circle cx='1849' cy='830' r='4.5' fill='#22c55e'/>
+<path d='M1849,948 V974' fill='none' stroke='#16a34a' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mgr)'/>
+<circle cx='1849' cy='948' r='4.5' fill='#22c55e'/>
+<path d='M1718,784 H1246 V1092' fill='none' stroke='#7c3aed' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mp)'/>
+<circle cx='1718' cy='784' r='4.5' fill='#22c55e'/>
+<path d='M1115,1138 H900 V476' fill='none' stroke='#7c3aed' stroke-width='2' stroke-dasharray='6 5' marker-end='url(#mp)'/>
+<circle cx='1115' cy='1138' r='4.5' fill='#22c55e'/>
+<text x='1708' y='776' text-anchor='end' font-size='11' fill='#7c3aed'>changed qty / rejects + reason</text>
+<text x='1860' y='843' font-size='11' fill='#16a34a'>approved</text>
+<text x='1860' y='961' font-size='11' fill='#16a34a'>ready</text>
+<text x='888' y='883' text-anchor='end' font-size='11' fill='#7c3aed'>Raghav + Deepa edit</text>
+<text x='888' y='898' text-anchor='end' font-size='11' fill='#7c3aed'>the rule (never automatic)</text>
+<text x='1100' y='1250' text-anchor='end' font-size='11' fill='#dc2626'>finance enters the</text>
+<text x='1100' y='1265' text-anchor='end' font-size='11' fill='#dc2626'>weekly loss numbers</text>
+<rect x='209' y='148' width='262' height='92' rx='8' fill='#e0e7ff' stroke='#4f46e5' stroke-width='2.5'/>
+<text x='340' y='180' text-anchor='middle' font-size='12.5' fill='#1f2937'>Exports the CSV files Tue / Fri:</text>
+<text x='340' y='198' text-anchor='middle' font-size='12.5' fill='#1f2937'>sales, stock, SKU list,</text>
+<text x='340' y='216' text-anchor='middle' font-size='12.5' fill='#1f2937'>festival calendar</text>
+<rect x='511' y='266' width='262' height='92' rx='8' fill='#dbeafe' stroke='#2563eb' stroke-width='2.5'/>
+<text x='642' y='289' text-anchor='middle' font-size='12.5' fill='#1f2937'>Upload any CSV, or add and</text>
+<text x='642' y='307' text-anchor='middle' font-size='12.5' fill='#1f2937'>remove SKUs and distributors</text>
+<text x='642' y='325' text-anchor='middle' font-size='12.5' fill='#1f2937'>Every row checked; bad rows are</text>
+<text x='642' y='343' text-anchor='middle' font-size='12.5' fill='#1f2937'>listed, nothing half-saved</text>
+<rect x='813' y='384' width='262' height='92' rx='8' fill='#dcfce7' stroke='#16a34a' stroke-width='2.5'/>
+<text x='944' y='407' text-anchor='middle' font-size='12.5' fill='#1f2937'>SKUs, vendors, sales, stock</text>
+<text x='944' y='425' text-anchor='middle' font-size='12.5' fill='#1f2937'>history, calendar, rules,</text>
+<text x='944' y='443' text-anchor='middle' font-size='12.5' fill='#1f2937'>decisions and POs: all editable</text>
+<text x='944' y='461' text-anchor='middle' font-size='12.5' fill='#1f2937'>POs not received = on order</text>
+<rect x='1115' y='502' width='262' height='92' rx='8' fill='#fef3c7' stroke='#ca8a04' stroke-width='2.5'/>
+<text x='1246' y='525' text-anchor='middle' font-size='12.5' fill='#1f2937'>Run planning (button, or Tue/Fri)</text>
+<text x='1246' y='543' text-anchor='middle' font-size='12.5' fill='#1f2937'>Raghav&apos;s 5 rules, read from Neon</text>
+<text x='1246' y='561' text-anchor='middle' font-size='12.5' fill='#1f2937'>1 rec per SKU, priority score</text>
+<text x='1246' y='579' text-anchor='middle' font-size='12.5' fill='#1f2937'>&lt;12 wks history = manual</text>
+<rect x='1416' y='620' width='262' height='92' rx='8' fill='#fce7f3' stroke='#db2777' stroke-width='2.5'/>
+<text x='1547' y='643' text-anchor='middle' font-size='12.5' fill='#1f2937'>1-line reason per flag</text>
+<text x='1547' y='661' text-anchor='middle' font-size='12.5' fill='#1f2937'>Trend &amp; anomaly summary</text>
+<text x='1547' y='679' text-anchor='middle' font-size='12.5' fill='#1f2937'>Words engine numbers only,</text>
+<text x='1547' y='697' text-anchor='middle' font-size='12.5' fill='#1f2937'>never computes qty or forecast</text>
+<rect x='1718' y='738' width='262' height='92' rx='8' fill='#ffedd5' stroke='#ea580c' stroke-width='2.5'/>
+<text x='1849' y='761' text-anchor='middle' font-size='12.5' fill='#1f2937'>Card per SKU with the metrics</text>
+<text x='1849' y='779' text-anchor='middle' font-size='12.5' fill='#1f2937'>Approve (qty editable) or Reject</text>
+<text x='1849' y='797' text-anchor='middle' font-size='12.5' fill='#1f2937'>(reason needed). A changed qty</text>
+<text x='1849' y='815' text-anchor='middle' font-size='12.5' fill='#1f2937'>also needs a reason</text>
+<rect x='1718' y='856' width='262' height='92' rx='8' fill='#e2e8f0' stroke='#475569' stroke-width='2.5'/>
+<text x='1849' y='879' text-anchor='middle' font-size='12.5' fill='#1f2937'>Approve creates that line&apos;s PO</text>
+<text x='1849' y='897' text-anchor='middle' font-size='12.5' fill='#1f2937'>Numbered DP-YYYY-NNNN, in the</text>
+<text x='1849' y='915' text-anchor='middle' font-size='12.5' fill='#1f2937'>standard PO format</text>
+<text x='1849' y='933' text-anchor='middle' font-size='12.5' fill='#1f2937'>(nothing without approval)</text>
+<rect x='1718' y='974' width='262' height='92' rx='8' fill='#dfe7f1' stroke='#334155' stroke-width='2.5'/>
+<text x='1849' y='997' text-anchor='middle' font-size='12.5' fill='#1f2937'>Download the PDF, or email it</text>
+<text x='1849' y='1015' text-anchor='middle' font-size='12.5' fill='#1f2937'>to the vendor from the dashboard</text>
+<text x='1849' y='1033' text-anchor='middle' font-size='12.5' fill='#1f2937'>(SMTP, e.g. a Gmail app password)</text>
+<text x='1849' y='1051' text-anchor='middle' font-size='12.5' fill='#1f2937'>then mark received</text>
+<rect x='1115' y='1092' width='262' height='92' rx='8' fill='#ede9fe' stroke='#7c3aed' stroke-width='2.5'/>
+<text x='1246' y='1115' text-anchor='middle' font-size='12.5' fill='#1f2937'>Every decision and reason kept</text>
+<text x='1246' y='1133' text-anchor='middle' font-size='12.5' fill='#1f2937'>Same rule changed &gt;=3x in 4 wks</text>
+<text x='1246' y='1151' text-anchor='middle' font-size='12.5' fill='#1f2937'>-&gt; queued on the Rules page</text>
+<text x='1246' y='1169' text-anchor='middle' font-size='12.5' fill='#1f2937'>Raghav + Deepa edit the rule</text>
+<rect x='1115' y='1210' width='262' height='92' rx='8' fill='#fee2e2' stroke='#dc2626' stroke-width='2.5'/>
+<text x='1246' y='1233' text-anchor='middle' font-size='12.5' fill='#1f2937'>Weekly losses (stockout + overstock)</text>
+<text x='1246' y='1251' text-anchor='middle' font-size='12.5' fill='#1f2937'>vs the pre-AI baseline, as a graph</text>
+<text x='1246' y='1269' text-anchor='middle' font-size='12.5' fill='#1f2937'>Day-90 verdict: keep, review,</text>
+<text x='1246' y='1287' text-anchor='middle' font-size='12.5' fill='#1f2937'>or shift back to manual</text>
+<text x='190' y='1392' font-size='12.5' fill='#374151'>Dashed arrows = data flow  |  Orange band = human gate: no PO without Raghav&#39;s approval  |  Purple = feedback loop, human-approved (rules never self-edit)  |  A PO counts as stock on order until marked received  |  No Apps Script, Drive or Sheets: Neon is the one database</text>
+</svg>
+

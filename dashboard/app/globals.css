@@ -228,3 +228,23 @@ details.card summary { cursor: pointer; font-weight: 800; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
 }
+
+/* rules + data pages */
+.rulegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 22px; }
+.rulefield { display: grid; gap: 4px; align-content: start; }
+.rulelabel { font-weight: 800; font-size: 14px; }
+.inputrow { display: flex; align-items: center; gap: 6px; }
+.inputrow input { max-width: 120px; }
+.unit { font-weight: 800; color: var(--muted); }
+select { padding: 9px 12px; border-radius: 12px; border: 1px solid rgba(47, 120, 80, 0.25); background: rgba(255, 255, 255, 0.85); color: var(--text); font: inherit; font-size: 14.5px; max-width: 160px; }
+input[type="file"] { font: inherit; font-size: 14px; padding: 8px; border-radius: 12px; border: 1px dashed rgba(47, 120, 80, 0.4); background: rgba(255, 255, 255, 0.6); width: 100%; }
+.datasets { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 22px; margin-bottom: 18px; }
+.upload { display: grid; gap: 10px; margin-top: 10px; }
+.upload .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.code { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: rgba(255, 255, 255, 0.7); border: 1px solid var(--border); border-radius: 8px; padding: 1px 6px; }
+.errlist { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }
+.editrow input, .editrow select { padding: 6px 8px; font-size: 13.5px; border-radius: 10px; }
+
+.colchips { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 8px 0; }
+.upload select { max-width: none; width: 100%; }
+.upload .row label { flex: 1; min-width: 220px; }

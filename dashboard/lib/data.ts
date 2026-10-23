@@ -1,28 +1,25 @@
-import { neon } from "@neondatabase/serverless";
-import demo from "./demo-data.json";
-import { applyDemo } from "./demo-apply.ts";
-import { readDemoDecisions } from "./demo-store.ts";
+import { dbConfigured, getSql, type Row } from "./db.ts";
 import { parseSettings, type LossEntry } from "./impact.ts";
 import type { Decision, PurchaseOrder, Rec, Run, RuleReview, Snapshot } from "./types.ts";
 
-export const hasDb = () => Boolean(process.env.DATABASE_URL);
+export const hasDb = dbConfigured;
 
 const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : String(v));
 const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
 
-/** Everything the pages need, in one place. Falls back to bundled demo data when DATABASE_URL is not set. */
-export async function getSnapshot(): Promise<Snapshot> {
-  if (!hasDb()) return applyDemo(demo as unknown as Snapshot, await readDemoDecisions());
-
-  const sql = neon(process.env.DATABASE_URL!);
-  const [runRows, decisionRows, reviewRows, poRows, lossRows, settingRows, firstLive] = await Promise.all([
+/** Everything the pages need, in one place. Null when the database is not connected yet. */
+export async function getSnapshot(): Promise<Snapshot | null> {
+  if (!dbConfigured()) return null;
+  const sql = getSql();
+  const [runRows, decisionRows, reviewRows, poRows, lossRows, settingRows, firstLive, distRows] = await Promise.all([
     sql`select * from runs order by run_at desc limit 40`,
     sql`select d.*, r.name from decisions d left join recommendations r on r.run_id = d.run_id and r.sku = d.sku order by d.decided_at desc limit 500`,
     sql`select * from rule_reviews order by opened_at desc limit 50`,
     sql`select * from purchase_orders order by created_at desc limit 100`,
-    sql`select * from loss_entries order by week_start`,
+    sql`select week_start::text as week_start, stockout_loss, overstock_writeoff, perishable_part, note, entered_by from loss_entries order by week_start`,
     sql`select key, value from settings`,
     sql`select min(run_at) as at from runs where mode = 'LIVE' and status = 'OK'`,
+    sql`select distributor_id, email from distributors where email is not null`,
   ]);
 
   const runs: Run[] = runRows.map((r) => ({
@@ -60,12 +57,12 @@ export async function getSnapshot(): Promise<Snapshot> {
     po_created_at: d.po_created_at ? iso(d.po_created_at) : null,
   }));
   const ruleReviews: RuleReview[] = reviewRows.map((r) => ({
-    opened_at: iso(r.opened_at), rule: r.rule, changed: num(r.changed), total: num(r.total), rate: r.rate,
+    id: Number(r.id), opened_at: iso(r.opened_at), rule: r.rule, changed: num(r.changed), total: num(r.total), rate: r.rate,
     proposal: r.proposal, status: r.status,
   }));
 
   const entries: LossEntry[] = lossRows.map((e) => ({
-    week_start: typeof e.week_start === "string" ? e.week_start.slice(0, 10) : new Date(e.week_start).toISOString().slice(0, 10),
+    week_start: String(e.week_start).slice(0, 10),
     stockout_loss: Number(e.stockout_loss), overstock_writeoff: Number(e.overstock_writeoff), perishable_part: Number(e.perishable_part),
     note: e.note ?? null, entered_by: e.entered_by ?? null,
   }));
@@ -73,13 +70,16 @@ export async function getSnapshot(): Promise<Snapshot> {
     settingRows.map((r) => ({ key: r.key, value: r.value })),
     firstLive[0]?.at ? iso(firstLive[0].at) : null,
   );
+
+  // Vendor emails: the distributor's own address, overridden by the last address a PO was sent to.
   const vendorEmails: Record<string, string> = {};
+  for (const r of distRows) if (r.email) vendorEmails[String(r.distributor_id)] = String(r.email);
   for (const r of settingRows) if (String(r.key).startsWith("email:") && r.value) vendorEmails[String(r.key).slice(6)] = String(r.value);
 
-  return { demo: false, runs, latestRun, recs, decisions, ruleReviews, pos: poRows.map(mapPo), impact: { entries, settings }, vendorEmails };
+  return { runs, latestRun, recs, decisions, ruleReviews, pos: poRows.map(mapPo), impact: { entries, settings }, vendorEmails };
 }
 
-function mapPo(p: Record<string, any>): PurchaseOrder { // eslint-disable-line @typescript-eslint/no-explicit-any
+function mapPo(p: Row): PurchaseOrder {
   return {
     po_number: p.po_number, created_at: iso(p.created_at), vendor_key: p.vendor_key, vendor_name: p.vendor_name ?? null,
     vendor: (typeof p.vendor === "string" ? JSON.parse(p.vendor) : p.vendor) ?? null,
@@ -91,8 +91,7 @@ function mapPo(p: Record<string, any>): PurchaseOrder { // eslint-disable-line @
 }
 
 export async function getPo(po_number: string): Promise<PurchaseOrder | null> {
-  if (!hasDb()) return (await getSnapshot()).pos.find((p) => p.po_number === po_number) ?? null;
-  const sql = neon(process.env.DATABASE_URL!);
-  const rows = await sql`select * from purchase_orders where po_number = ${po_number}`;
+  if (!dbConfigured()) return null;
+  const rows = await getSql()`select * from purchase_orders where po_number = ${po_number}`;
   return rows.length ? mapPo(rows[0]) : null;
 }

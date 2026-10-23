@@ -70,6 +70,7 @@ export type Decision = {
 };
 
 export type RuleReview = {
+  id: number;
   opened_at: string;
   rule: string;
   changed: number | null;
@@ -116,7 +117,6 @@ export type PurchaseOrder = {
 };
 
 export type Snapshot = {
-  demo: boolean;
   runs: Run[]; // newest first
   latestRun: Run | null;
   recs: Rec[]; // for latestRun, priority desc

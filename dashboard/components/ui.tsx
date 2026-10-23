@@ -58,13 +58,3 @@ export function KillChecks({ checks }: { checks: KillCheck[] }) {
     </div>
   );
 }
-
-export function DemoBanner({ demo }: { demo: boolean }) {
-  if (!demo) return null;
-  return (
-    <div className="banner" role="note">
-      <strong>Practice mode.</strong> No database is connected, so this shows the real rules engine run on your five sample CSVs. Nothing has been
-      decided: you decide. Your clicks are kept in this browser only, so you can try Approve, Reject and the POs. Connect Neon (<code>DATABASE_URL</code>) to make it real.
-    </div>
-  );
-}

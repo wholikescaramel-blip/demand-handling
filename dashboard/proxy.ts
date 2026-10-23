@@ -2,14 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, timingSafeEqual, tokenFor } from "./lib/auth.ts";
 
 /**
- * Password gate for the dashboard. /api/ingest is excluded (it checks its own shared secret) and /login is public.
- * With no DASHBOARD_PASSWORD set the dashboard is open, which is only sensible for local demo mode.
+ * Password gate for the whole dashboard. Only the login page and the scheduled-run endpoint (which checks its own secret)
+ * are outside it. The review page can approve orders, so with a database connected but no DASHBOARD_PASSWORD the site
+ * refuses to load rather than staying open.
  */
 export async function proxy(req: NextRequest) {
   const password = process.env.DASHBOARD_PASSWORD;
   if (!password) {
-    // Demo mode (no database) is harmless to leave open. With a database connected, fail closed: the review page can
-    // approve orders, so it must never be reachable without a password.
     if (process.env.DATABASE_URL) {
       return new NextResponse("DASHBOARD_PASSWORD is not set. Add it in the Vercel project settings and redeploy.", { status: 503 });
     }
@@ -26,5 +25,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/ingest|api/open-pos|api/decisions|api/status|api/po|login|api/login|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/cron|login|api/login|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -1,6 +1,7 @@
 import { getSnapshot } from "@/lib/data";
 import { mailConfigured } from "@/lib/mail";
-import { DemoBanner, Kpi, PoPill, fmtDateTime } from "@/components/ui";
+import { Kpi, PoPill, fmtDateTime } from "@/components/ui";
+import { NotConnected } from "@/components/NotConnected";
 import { PoActions } from "@/components/PoActions";
 import { generatePos, markReceived } from "../review/actions";
 
@@ -11,13 +12,13 @@ const inr = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2,
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ error?: string; created?: string; ok?: string }> }) {
   const { error, created, ok } = await searchParams;
   const snap = await getSnapshot();
+  if (!snap) return <NotConnected />;
   const waiting = snap.decisions.filter((d) => d.po_status === "READY");
   const onOrder = snap.pos.filter((p) => !p.received_at);
   const emailOn = mailConfigured();
 
   return (
     <>
-      <DemoBanner demo={snap.demo} />
       <h1>Purchase orders</h1>
       <p className="sub">
         Every approval creates one numbered PO. Download it, or email it to the vendor from here. Nothing is created without Raghav pressing Approve.
@@ -38,7 +39,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <section className="card" style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
             <h2 style={{ margin: 0 }}>Approved, but the PO was not created ({waiting.length})</h2>
-            <form action={generatePos}><button className="btn primary" type="submit" disabled={snap.demo}>Create the missing POs</button></form>
+            <form action={generatePos}><button className="btn primary" type="submit">Create the missing POs</button></form>
           </div>
           <div className="tablewrap">
             <table>
@@ -72,14 +73,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               </div>
             </div>
             <p className="small" style={{ margin: "10px 0" }}>{p.lines.map((l) => `${l.sku} ${l.name ?? ""} × ${l.qty}`).join("  ·  ")}</p>
-            <PoActions po={p} emailOn={emailOn} canEmail={!snap.demo} from="orders" defaultTo={snap.vendorEmails?.[p.vendor_key] ?? p.vendor?.email ?? ""} />
+            <PoActions po={p} emailOn={emailOn} from="orders" defaultTo={snap.vendorEmails?.[p.vendor_key] ?? p.vendor?.email ?? ""} />
             <div style={{ marginTop: 10 }}>
               {p.received_at ? (
                 <span className="pill ok">Received {fmtDateTime(p.received_at)}</span>
               ) : (
                 <form action={markReceived}>
                   <input type="hidden" name="po_number" value={p.po_number} />
-                  <button className="btn" type="submit" disabled={snap.demo}>Mark received</button>
+                  <button className="btn" type="submit">Mark received</button>
                 </form>
               )}
             </div>

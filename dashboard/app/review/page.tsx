@@ -1,9 +1,10 @@
 import { getSnapshot } from "@/lib/data";
 import { mailConfigured } from "@/lib/mail";
-import { ActionPill, DecisionPill, DemoBanner, PoPill, fmtDateTime } from "@/components/ui";
+import { ActionPill, DecisionPill, PoPill, fmtDateTime } from "@/components/ui";
 import { DecisionForm } from "@/components/DecisionForm";
 import { PoActions } from "@/components/PoActions";
-import { createPoForLine, decide, resetPractice } from "./actions";
+import { NotConnected } from "@/components/NotConnected";
+import { createPoForLine, decide, runPlanningNow } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ function recommendationText(action: string, qty: number | null): string {
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string; sku?: string }> }) {
   const { error, ok, sku: errSku } = await searchParams;
   const snap = await getSnapshot();
+  if (!snap) return <NotConnected />;
   const run = snap.latestRun;
   const live = run?.mode === "LIVE";
   const pending = live ? snap.recs.filter((r) => !r.decision) : [];
@@ -34,15 +36,21 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <DemoBanner demo={snap.demo} />
-      <h1>Review</h1>
-      <p className="sub">
-        {run ? (
-          <>Run {run.run_id} · stock as of {run.as_of} · {live ? (run.review_due_at ? `decide by ${fmtDateTime(run.review_due_at)}` : "waiting for your decisions") : "shadow mode: nothing to decide"}</>
-        ) : (
-          "No run yet."
-        )}
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1>Review</h1>
+          <p className="sub" style={{ marginBottom: 12 }}>
+            {run ? (
+              <>Run {run.run_id} · stock as of {run.as_of} · {live ? (run.review_due_at ? `decide by ${fmtDateTime(run.review_due_at)}` : "waiting for your decisions") : "shadow mode: nothing to decide"}</>
+            ) : (
+              "No planning run yet. Press Run planning to apply the rules to the data in Neon."
+            )}
+          </p>
+        </div>
+        <form action={runPlanningNow}>
+          <button className="btn primary" type="submit">Run planning now</button>
+        </form>
+      </div>
 
       {error ? <div className="banner bad" role="alert">{error}</div> : null}
       {ok ? <div className="banner good" role="status">{ok}</div> : null}
@@ -50,8 +58,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       {run && !live ? (
         <section className="card">
           <p style={{ margin: 0 }}>
-            This run was made in <strong>shadow mode</strong>, so it was logged but not sent for review. When you are ready to go live, set
-            SHADOW_MODE to FALSE in the Rules_Config tab of the Sheet.
+            This run was made in <strong>shadow mode</strong>, so it was logged but not sent for review. Turn shadow mode off on the Rules page, then run planning again.
           </p>
         </section>
       ) : null}
@@ -60,8 +67,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <section style={{ marginBottom: 18 }}>
           <h2 className="sectiontitle">Waiting for your decision ({pending.length})</h2>
           <p className="small dim" style={{ marginTop: -4 }}>
-            The rules only recommend. Nothing is ordered until you press Approve. The quantity box starts at the recommendation; change it if
-            you know better. Rejecting needs a reason.
+            The rules only recommend. Nothing is ordered until you press Approve. The quantity box starts at the recommendation; change it if you
+            know better. Rejecting needs a reason.
           </p>
           {!pending.length ? <div className="card"><p className="dim" style={{ margin: 0 }}>Nothing waiting. Everything in this run has a decision.</p></div> : null}
           <div className="reviewlist">
@@ -87,7 +94,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                   <div><dt>Triggered by</dt><dd>{(r.flags ?? "").split(" + ").filter(Boolean).map((f) => FLAG_LABEL[f] ?? f).join(", ") || "n/a"}</dd></div>
                 </dl>
                 <p style={{ margin: "8px 0 0" }}>{r.reason}</p>
-                <div className="small dim">{r.reason_source === "gemini" ? "Reason written by Gemini" : "Standard reason text"}{r.data_notes ? ` · ${r.data_notes}` : ""}</div>
+                <div className="small dim">{r.reason_source === "gemini" ? "Reason worded by Gemini" : "Standard reason text"}{r.data_notes ? ` · ${r.data_notes}` : ""}</div>
 
                 <DecisionForm action={decide} runId={r.run_id} sku={r.sku} recQty={r.rec_qty} kind={r.action as "REORDER" | "PAUSE" | "MANUAL_REVIEW"} />
               </article>
@@ -118,7 +125,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                   {po ? (
                     <div style={{ marginTop: 10 }}>
                       <div style={{ fontWeight: 700, marginBottom: 6 }}>Purchase order {po.po_number}</div>
-                      <PoActions po={po} emailOn={emailOn} canEmail={!snap.demo} from="review" defaultTo={snap.vendorEmails?.[po.vendor_key] ?? po.vendor?.email ?? ""} />
+                      <PoActions po={po} emailOn={emailOn} from="review" defaultTo={snap.vendorEmails?.[po.vendor_key] ?? po.vendor?.email ?? ""} />
                     </div>
                   ) : r.po_status === "READY" ? (
                     <form action={createPoForLine} style={{ marginTop: 10 }}>
@@ -132,12 +139,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             })}
           </div>
         </section>
-      ) : null}
-
-      {snap.demo ? (
-        <form action={resetPractice} style={{ marginTop: 18 }}>
-          <button className="btn" type="submit">Clear my practice decisions</button>
-        </form>
       ) : null}
     </>
   );

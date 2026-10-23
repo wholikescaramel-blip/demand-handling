@@ -3,15 +3,14 @@ import type { PurchaseOrder } from "@/lib/types";
 
 /** The two things you do with a PO once it exists: download it, or email it. */
 export function PoActions({
-  po, emailOn, defaultTo, from, canEmail,
+  po, emailOn, defaultTo, from,
 }: {
   po: PurchaseOrder;
   emailOn: boolean;
   defaultTo: string;
   from: "review" | "orders";
-  canEmail: boolean; // false in practice mode
 }) {
-  const enabled = emailOn && canEmail;
+  const enabled = emailOn;
   return (
     <div className="poactions">
       <div className="btns">
@@ -25,7 +24,7 @@ export function PoActions({
           Email to
           <input name="to" type="email" defaultValue={defaultTo} placeholder="vendor@example.com" required disabled={!enabled} />
         </label>
-        <button className="btn" type="submit" disabled={!enabled} title={enabled ? "" : canEmail ? "Email is not set up yet" : "Email needs a connected database"}>
+        <button className="btn" type="submit" disabled={!enabled} title={enabled ? "" : "Email is not set up yet"}>
           Send by email
         </button>
       </form>

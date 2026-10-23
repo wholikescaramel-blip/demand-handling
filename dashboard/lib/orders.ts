@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { getSql } from "./db.ts";
 import { formatPoNumber, groupByVendor, type PoLine } from "./po.ts";
 import { lineAmount } from "./pdf.ts";
 
@@ -14,7 +14,7 @@ export type GenerateResult = {
  * anything goes wrong, the lines go back to READY and the next call retries them.
  */
 export async function generatePosForReady(only?: { run_id: string; sku: string }): Promise<GenerateResult> {
-  const sql = neon(process.env.DATABASE_URL!);
+  const sql = getSql();
   const result: GenerateResult = { created: [], failed: [] };
   const rid = only?.run_id ?? null;
   const sk = only?.sku ?? null;
@@ -27,8 +27,8 @@ export async function generatePosForReady(only?: { run_id: string; sku: string }
     returning d.run_id, d.sku, d.final_qty, d.reviewer, r.name, r.distributor_id, r.distributor_name, r.unit, r.hsn, r.unit_cost, r.tax_pct`;
 
   // Vendor details (address, GSTIN, contact, email) as they are right now; frozen into each PO.
-  const vendorRows = await sql`select * from vendors`;
-  const vendorBy = new Map(vendorRows.map((v) => [String(v.vendor_key), v]));
+  const vendorRows = await sql`select * from distributors`;
+  const vendorBy = new Map(vendorRows.map((v) => [String(v.distributor_id), v]));
 
   const lines: (PoLine & { reviewer: string | null })[] = claimed.map((c) => ({
     run_id: c.run_id, sku: c.sku, name: c.name, qty: Number(c.final_qty),
