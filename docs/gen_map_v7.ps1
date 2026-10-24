@@ -21,7 +21,7 @@ $sb=New-Object System.Text.StringBuilder
 function A($s){ [void]$sb.AppendLine($s) }
 A "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 $W $H' width='$W' height='$H' font-family='Segoe UI, Arial, sans-serif'>"
 A "<defs>"
-foreach($m in @(@('g','#475569'),@('o','#ea580c'),@('gr','#16a34a'),@('p','#7c3aed'),@('t','#0f766e'))){ A "<marker id='m$($m[0])' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='$($m[1])'/></marker>" }
+foreach($m in @(@('g','#475569'),@('o','#ea580c'),@('gr','#16a34a'),@('p','#7c3aed'),@('t','#0f766e'),@('r','#dc2626'))){ A "<marker id='m$($m[0])' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0,0 L10,5 L0,10 z' fill='$($m[1])'/></marker>" }
 A "</defs>"
 A "<rect width='$W' height='$H' fill='#ffffff'/>"
 A "<text x='1000' y='46' text-anchor='middle' font-size='22' font-weight='700' fill='#111'>Demand Planning &#183; Freshroots &#8212; Components Map (v7)</text>"
@@ -65,8 +65,12 @@ A "<text x='1860' y='$((Bot 5)+13)' font-size='11' fill='#16a34a'>approved</text
 A "<text x='1860' y='$((Bot 6)+13)' font-size='11' fill='#16a34a'>ready</text>"
 A "<text x='888' y='$((RT 6)+40)' text-anchor='end' font-size='11' fill='#7c3aed'>Raghav + Deepa edit</text>"
 A "<text x='888' y='$((RT 6)+55)' text-anchor='end' font-size='11' fill='#7c3aed'>the rule (never automatic)</text>"
-A "<text x='995' y='$((Cy 9)-6)' text-anchor='end' font-size='11' fill='#dc2626'>finance enters the</text>"
-A "<text x='995' y='$((Cy 9)+9)' text-anchor='end' font-size='11' fill='#dc2626'>weekly loss numbers</text>"
+A "<text x='995' y='$((Cy 9)-6)' text-anchor='end' font-size='11' fill='#dc2626'>reads runs, decisions, rules;</text>"
+A "<text x='995' y='$((Cy 9)+9)' text-anchor='end' font-size='11' fill='#dc2626'>finance's weekly losses saved to Neon</text>"
+# Overview tab: reads runs, decisions, impact entries and rules from Neon; finance entries are saved back; its button runs planning
+P "M1040,$(Bot 2) V$(Cy 9) H1115" '#dc2626' 'r' @(1040,(Bot 2))
+P "M1377,$(Cy 9) H1395 V$(Cy 3) H1377" '#dc2626' 'r' @(1377,(Cy 9))
+A "<text x='1405' y='$((Cy 9)-8)' font-size='11' fill='#dc2626'>Run planning now</text>"
 # boxes
 for($i=0;$i -lt $rows.Count;$i++){
  $r=$rows[$i]; $y=(RT $i)+13; $x=$cx[$r.c]-131
@@ -74,7 +78,8 @@ for($i=0;$i -lt $rows.Count;$i++){
  $n=$r.t.Count; $ty=$y+46-($n-1)*9+4
  for($j=0;$j -lt $n;$j++){ $line=[System.Security.SecurityElement]::Escape($r.t[$j]); A "<text x='$($cx[$r.c])' y='$($ty+18*$j)' text-anchor='middle' font-size='12.5' fill='#1f2937'>$line</text>" }
 }
-A "<text x='190' y='1512' font-size='12.5' fill='#374151'>Dashed arrows = data flow  |  Orange band = human gate: no PO without Raghav or Deepa approving  |  Purple = feedback loop, human-approved (rules never self-edit)  |  Teal = stock view and hand-entered SKU info  |  A PO counts as stock on order until marked received  |  No login, no email: Neon is the one database</text>"
+A "<text x='190' y='1500' font-size='12.5' fill='#374151'>Dashed arrows = data flow  |  Orange band = human gate: no PO without Raghav or Deepa approving  |  Purple = feedback loop, human-approved (rules never self-edit)  |  A PO counts as stock on order until marked received</text>"
+A "<text x='190' y='1520' font-size='12.5' fill='#374151'>Teal = Stock tab: live view, hand-entered SKU info saved back  |  Red = Overview: reads Neon, saves finance's loss entries, can start a run  |  No login, no email: Neon is the one database</text>"
 A "</svg>"
 $sb.ToString() | Set-Content -Encoding utf8 "$out\demand_planning_components_map_v7.svg"
 "written"
